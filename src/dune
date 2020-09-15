@@ -1,0 +1,4 @@
+(library (name krb_public) (public_name krb)
+ (libraries async core username_kernel krb_internal_public
+  async.persistent_connection protocol_version_header)
+ (preprocess (pps ppx_jane -check-doc-comments -annotated-ignores)))

@@ -1,0 +1,4 @@
+(library (name krb_internal_public) (public_name krb.internal)
+ (libraries async core env_config hex_encode) (c_flags -I /usr/include/et)
+ (library_flags -cclib -lkrb5 -cclib -lk5crypto) (c_names raw_stubs)
+ (preprocess (pps ppx_jane -check-doc-comments -annotated-ignores)))
