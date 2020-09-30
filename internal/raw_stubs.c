@@ -1982,6 +1982,7 @@ caml_krb5_get_credentials(value v_context_token, value v_options,
   krb5_creds in_creds = get_val(krb5_creds, v_in_creds);
   krb5_creds *out_creds;
   krb5_error_code retval;
+  krb5_ccache ccache = get_val(krb5_ccache, v_ccache);
 
   while(v_options != Val_int(0)) {
     switch(Int_val(Field(v_options, 0))) {
@@ -1995,11 +1996,13 @@ caml_krb5_get_credentials(value v_context_token, value v_options,
     v_options = Field(v_options, 1);
   }
 
+  caml_release_runtime_system();
   retval = krb5_get_credentials(context,
                                 options,
-                                get_val(krb5_ccache, v_ccache),
+                                ccache,
                                 &in_creds,
                                 &out_creds);
+  caml_acquire_runtime_system();
 
   if(retval) {
     CAMLreturn(wrap_result(Val_unit, retval));
