@@ -3,12 +3,19 @@ open Async
 open Import
 
 type t =
-  { cred_cache : Internal.Cred_cache.t
-  ; default_to_store_service_tickets : Internal.Cred_cache.t option
-  }
-[@@deriving fields, sexp_of]
+  | Single_cache of Internal.Cred_cache.t
+  | Double_cache of
+      { memory_cache : Internal.Cred_cache.t
+      ; default_cache : Internal.Cred_cache.t
+      }
+[@@deriving sexp_of]
 
-let of_cred_cache cred_cache = { cred_cache; default_to_store_service_tickets = None }
+let cred_cache = function
+  | Single_cache cache -> cache
+  | Double_cache { memory_cache; default_cache = _ } -> memory_cache
+;;
+
+let of_cred_cache cred_cache = Single_cache cred_cache
 
 let in_memory () =
   let%bind principal =
@@ -19,74 +26,66 @@ let in_memory () =
       return (Principal.Name.User username)
   in
   let open Deferred.Or_error.Let_syntax in
-  let%bind cred_cache = Cred_cache.in_memory_for_principal principal in
-  let%bind default = Internal.Cred_cache.default () in
-  Deferred.Or_error.return { cred_cache; default_to_store_service_tickets = Some default }
+  let%bind memory_cache = Cred_cache.in_memory_for_principal principal in
+  let%bind default_cache = Internal.Cred_cache.default () in
+  return (Double_cache { memory_cache; default_cache })
 ;;
 
-let store_in_cred_cache cred_cache ~request ~credentials =
-  (* We try to avoid storing the same credentials more than once. It is still possible
-     if there are concurrent calls to this function, oh well. *)
-  Internal.Cred_cache.get_credentials
-    ~tag_error_with_all_credentials:false
-    ~flags:[ Internal.Krb_flags.Get_credentials.KRB5_GC_CACHED ]
-    cred_cache
-    ~request
-  >>| Result.is_ok
-  >>= fun already_cached ->
-  if not already_cached
-  then Internal.Cred_cache.store cred_cache credentials
-  else Deferred.Or_error.ok_unit
+let get_cached ~flags cred_cache ~request =
+  let open Deferred.Let_syntax in
+  match%bind
+    Internal.Cred_cache.get_credentials
+      ~tag_error_with_all_credentials:false
+      cred_cache
+      ~request
+      ~flags:(Internal.Krb_flags.Get_credentials.KRB5_GC_CACHED :: flags)
+  with
+  | Ok x -> return (Ok (Some x))
+  | Error _ -> return (Ok None)
 ;;
 
-(* The places in which we look for creds are, in priority order:
-
-   1) cached in [cred_cache]
-   2) cached in [default_to_store_service_tickets]
-   3) from the KDC
-
-   This is much like what happens if you just use [cred_cache], with one extra layer of
-   caching before we talk to the KDC if we have a [default_to_store_service_tickets].
-*)
 let get_credentials ~flags t ~request =
   let open Deferred.Or_error.Let_syntax in
-  let%bind credentials, where_to_save =
-    let get_cached cred_cache =
-      let open Deferred.Let_syntax in
-      match%bind
-        Internal.Cred_cache.get_credentials
-          ~tag_error_with_all_credentials:false
-          cred_cache
-          ~request
-          ~flags:(Internal.Krb_flags.Get_credentials.KRB5_GC_CACHED :: flags)
-      with
-      | Ok x -> return (Ok (Some x))
-      | Error _ -> return (Ok None)
-    in
-    let%bind cached =
-      match t.default_to_store_service_tickets with
-      | None ->
-        (* If there's no [default_to_store_service_tickets], don't bother checking for
-           cached credentials separately; [get_credentials] will do the right thing. *)
-        return None
-      | Some default_cache ->
-        (match%bind get_cached t.cred_cache with
-         | Some cred -> return (Some cred)
-         | None -> get_cached default_cache)
-    in
-    match cached with
-    | Some cred -> return (cred, `Nowhere)
-    | None ->
-      let%bind cred = Internal.Cred_cache.get_credentials ~flags t.cred_cache ~request in
-      return (cred, `To_default_cache)
+  let with_default_cache_error error d =
+    Deferred.Or_error.map d ~f:(fun x -> x, `Error_getting_creds_from_default_cache error)
   in
-  match t.default_to_store_service_tickets, where_to_save with
-  | Some _, `Nowhere | None, _ ->
-    return (credentials, `Error_storing_in_default_cache None)
-  | Some default_cred_cache, `To_default_cache ->
-    let open Deferred.Let_syntax in
-    let%bind error =
-      store_in_cred_cache default_cred_cache ~request ~credentials >>| Result.error
-    in
-    Deferred.Or_error.return (credentials, `Error_storing_in_default_cache error)
+  match t with
+  | Single_cache cred_cache ->
+    (* The [Client_cred_cache] wrapper does nothing. Just call [get_credentials]. *)
+    Internal.Cred_cache.get_credentials ~flags cred_cache ~request
+    |> with_default_cache_error None
+  | Double_cache { memory_cache; default_cache } ->
+    (* First check to see if we have this ticket already cached in the memory cred cache.
+    *)
+    (match%bind get_cached ~flags memory_cache ~request with
+     | Some cred -> return cred |> with_default_cache_error None
+     | None ->
+       (* Next, try to get a ticket from the default cache. Either this ticket is cached
+          already or, if there is a TGT, we will talk to the KDC to get a ticket. Either
+          way, if this is successful, the default cache will have this ticket. *)
+       (match%bind.Deferred
+          Internal.Cred_cache.get_credentials ~flags default_cache ~request
+        with
+        | Ok cred ->
+          (* Save this ticket into the memory cache *)
+          let%bind () =
+            Internal.Cred_cache.store_if_not_in_cache memory_cache ~request cred
+          in
+          return cred |> with_default_cache_error None
+        | Error error ->
+          (* Most likely this means that the default cred cache doesn't exist or doesn't
+             have a TGT. We try to get a ticket using the memory cache. We don't bother
+             saving the ticket back into the default cache because that cache already
+             doesn't have a TGT, so something strange is probably happening. *)
+          Internal.Cred_cache.get_credentials ~flags memory_cache ~request
+          |> with_default_cache_error (Some error)))
 ;;
+
+module For_testing = struct
+  let create ~memory_cache ~default_cache = Double_cache { memory_cache; default_cache }
+
+  let cred_caches = function
+    | Single_cache cache -> [ cache ]
+    | Double_cache { memory_cache; default_cache } -> [ memory_cache; default_cache ]
+  ;;
+end

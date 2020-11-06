@@ -322,7 +322,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun (auth_context, client) ->
         let client_principal_name = Principal.name client in
         let on_connection_result =
-          Util.do_on_connection
+          On_connection.run
             ~f:on_connection
             ~acting_as:Server
             ~peer_address:peer
@@ -408,7 +408,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Internal.Principal.of_string server_principal_s
         >>=? fun server_principal ->
         let server_principal_name = Principal.name server_principal in
-        Util.do_on_connection
+        On_connection.run
           ~f:on_connection
           ~acting_as:Client
           ~peer_address:peer
@@ -549,7 +549,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.write ~backend ap_rep;
         let client_principal_name = Principal.name client in
         let on_connection_result =
-          Util.do_on_connection
+          On_connection.run
             ~f:on_connection
             ~acting_as:Server
             ~peer_address:peer
@@ -643,7 +643,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
         let server_principal_name = Header.Server.principal server_header in
-        Util.do_on_connection
+        On_connection.run
           ~f:on_connection
           ~acting_as:Client
           ~peer_address:peer
@@ -793,7 +793,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.write ~backend ap_rep;
         let client_principal_name = Principal.name client in
         let on_connection_result =
-          Util.do_on_connection
+          On_connection.run
             ~f:on_connection
             ~acting_as:Server
             ~peer_address:peer
@@ -940,7 +940,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
         let server_principal_name = Header.Server.principal server_header in
-        Util.do_on_connection
+        On_connection.run
           ~f:on_connection
           ~acting_as:Client
           ~peer_address:peer
@@ -1123,7 +1123,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.write ~backend ap_rep;
         let client_principal_name = Principal.name client in
         let on_connection_result =
-          Util.do_on_connection
+          On_connection.run
             ~f:on_connection
             ~acting_as:Server
             ~peer_address:peer
@@ -1184,14 +1184,14 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~flags:cred_cache_flags
           client_cred_cache
           ~request:credentials_request
-        >>=? fun (credentials, `Error_storing_in_default_cache maybe_error) ->
+        >>=? fun (credentials, `Error_getting_creds_from_default_cache maybe_error) ->
         (match maybe_error with
          | None -> ()
          | Some error ->
            Log.Global.sexp
              ~level:`Info
              [%message
-               "Failed to store retrieved service ticket into default cred cache."
+               "Failed to get credentials from default cache (succeeded with memory cache)"
                  (error : Error.t)
                  (client_cred_cache : Client_cred_cache.t)]);
         let init_auth_context () =
@@ -1240,7 +1240,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
         let server_principal_name = Header.Server.principal server_header in
-        Util.do_on_connection
+        On_connection.run
           ~f:on_connection
           ~acting_as:Client
           ~peer_address:peer
@@ -1345,8 +1345,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     ;;
 
     let serve ?on_connection ~accepted_conn_types ~principal ~peer endpoint backend =
-      Deferred.Or_error.try_with (fun () ->
-        serve_exn ?on_connection ~accepted_conn_types ~principal ~peer endpoint backend)
+      Deferred.Or_error.try_with
+        ~run:
+          `Schedule
+        ~rest:`Log
+        (fun () ->
+           serve_exn ?on_connection ~accepted_conn_types ~principal ~peer endpoint backend)
       >>| function
       | Error e -> Error (`Handshake_error e)
       | Ok (_ as result) -> result
@@ -1468,23 +1472,27 @@ module Client = struct
     let timeout = Time.diff finish_handshake_by (Time.now ()) in
     let peer = Socket.getpeername socket in
     let result =
-      Deferred.Or_error.try_with_join (fun () ->
-        negotiate_and_setup
-          ?override_supported_versions
-          ~on_connection
-          ~client_cred_cache
-          ~accepted_conn_types
-          ~peer
-          backend)
+      Deferred.Or_error.try_with_join
+        ~run:
+          `Schedule
+        ~rest:`Log
+        (fun () ->
+           negotiate_and_setup
+             ?override_supported_versions
+             ~on_connection
+             ~client_cred_cache
+             ~accepted_conn_types
+             ~peer
+             backend)
     in
     let return_error err =
       let%bind () = close_connection_via_reader_and_writer reader writer in
-      Deferred.Or_error.fail err
+      Deferred.Or_error.fail
+        (Error.tag err ~tag:"The server logs might have more information.")
     in
     match%bind Clock.with_timeout timeout result with
     | `Result (Ok (`Ok res)) -> Deferred.Or_error.return res
-    | `Result (Error error) ->
-      return_error (Error.tag error ~tag:"The server logs might have more information.")
+    | `Result (Error error) -> return_error error
     | `Timeout ->
       return_error
         (Error.create_s
@@ -1503,18 +1511,22 @@ module Client = struct
         ~accepted_conn_types
         where_to_connect
     =
-    Deferred.Or_error.try_with_join (fun () ->
-      connect_exn
-        ?override_supported_versions
-        ?buffer_age_limit
-        ?interrupt
-        ?reader_buffer_size
-        ?writer_buffer_size
-        ?timeout
-        ?on_connection
-        ~client_cred_cache
-        ~accepted_conn_types
-        where_to_connect)
+    Deferred.Or_error.try_with_join
+      ~run:
+        `Schedule
+      ~rest:`Log
+      (fun () ->
+         connect_exn
+           ?override_supported_versions
+           ?buffer_age_limit
+           ?interrupt
+           ?reader_buffer_size
+           ?writer_buffer_size
+           ?timeout
+           ?on_connection
+           ~client_cred_cache
+           ~accepted_conn_types
+           where_to_connect)
   ;;
 end
 

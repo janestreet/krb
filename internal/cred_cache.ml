@@ -208,6 +208,25 @@ let initialize_and_store t principal creds =
       Raw.store_cred c t.raw (Credentials.to_raw cred)))
 ;;
 
+let store_if_not_in_cache t ~request cred =
+  let tag_arguments = lazy [%message "" ~cred_cache:(t : t) (cred : Credentials.t)] in
+  let info =
+    Krb_info.create ~tag_arguments "[krb5_get_credentials]/[krb5_cc_store_cred]"
+  in
+  Context_sequencer.enqueue_job_with_info ~info ~f:(fun c ->
+    match
+      Raw.get_credentials
+        c
+        [ KRB5_GC_CACHED ]
+        t.raw
+        ~request:(Credentials.to_raw request)
+    with
+    | Ok credentials_raw ->
+      Credentials.Raw.free c credentials_raw;
+      Ok ()
+    | Error _ -> Raw.store_cred c t.raw (Credentials.to_raw cred))
+;;
+
 let principal t =
   let tag_arguments = lazy [%message "" ~cred_cache:(t : t)] in
   let tag_error = function

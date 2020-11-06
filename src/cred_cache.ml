@@ -40,7 +40,13 @@ let in_memory_for_principal principal_name =
 ;;
 
 let mktemp template =
-  let%bind tmpfile, fd = Deferred.Or_error.try_with (fun () -> Unix.mkstemp template) in
+  let%bind tmpfile, fd =
+    Deferred.Or_error.try_with
+      ~run:
+        `Schedule
+      ~rest:`Log
+      (fun () -> Unix.mkstemp template)
+  in
   let%map () = Fd.close fd |> Deferred.ok in
   tmpfile
 ;;
@@ -62,7 +68,11 @@ let initialize_with_creds cred_cache principal all_creds =
       Deferred.Or_error.List.iter all_creds ~f:(fun creds ->
         Internal.Cred_cache.store cred_cache_staging creds)
     in
-    Deferred.Or_error.try_with (fun () -> Unix.rename ~src ~dst)
+    Deferred.Or_error.try_with
+      ~run:
+        `Schedule
+      ~rest:`Log
+      (fun () -> Unix.rename ~src ~dst)
   | _ ->
     (* [MEMORY] is the default credential cache. Unfortunately [remove] is not
        implemented, so to avoid growing a cred cache forever, we must call [initialize].

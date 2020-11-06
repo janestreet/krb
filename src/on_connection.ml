@@ -9,7 +9,7 @@ module Acting_as = struct
   [@@deriving sexp_of]
 end
 
-let do_on_connection
+let run
       (type peer)
       ~(f : Socket.Address.Inet.t -> peer -> [ `Accept | `Reject ])
       ~(acting_as : peer Acting_as.t)

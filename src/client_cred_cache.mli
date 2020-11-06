@@ -24,11 +24,34 @@ val of_cred_cache : Internal.Cred_cache.t -> t
 val in_memory : unit -> t Deferred.Or_error.t
 val cred_cache : t -> Internal.Cred_cache.t
 
-(** Similar to [Internal.Cred_cache.get_credentials]. If [t] was created using
-    [in_memory], then also store the supplied [credentials] into [Cred_cache.default]. *)
+(** If [t] was created using [of_cred_cache], this just calls
+    [Internal.Cred_cache.get_credentials].
+
+    If [t] was created using [in_memory], then we try to get a ticket in the following
+    order:
+
+    (1) Check for a cached ticket in the memory cache
+    (2) Call [Internal.Cred_cache.get_credentials] on the default cache. If this succeeds,
+    store the ticket in the memory cache.
+    (3) Get a ticket using the memory cache's TGT.
+
+    If cases (1) or (2) succeed, then both the memory cache and the default cache will
+    have the ticket.
+
+    In case (3), only the memory cache will have the ticket. *)
 val get_credentials
   :  flags:Internal.Krb_flags.Get_credentials.t list
   -> t
   -> request:Internal.Credentials.t
-  -> (Internal.Credentials.t * [ `Error_storing_in_default_cache of Error.t option ])
+  -> (Internal.Credentials.t
+      * [ `Error_getting_creds_from_default_cache of Error.t option ])
        Deferred.Or_error.t
+
+module For_testing : sig
+  val create
+    :  memory_cache:Internal.Cred_cache.t
+    -> default_cache:Internal.Cred_cache.t
+    -> t
+
+  val cred_caches : t -> Internal.Cred_cache.t list
+end

@@ -179,7 +179,11 @@ module Client = struct
       ~krb_mode
       where_to_connect
     >>=? fun (kerberized_rw, server_principal) ->
-    Deferred.Or_error.try_with (fun () -> f kerberized_rw server_principal)
+    Deferred.Or_error.try_with
+      ~run:
+        `Schedule
+      ~rest:`Log
+      (fun () -> f kerberized_rw server_principal)
     >>= fun result ->
     Writer.close (Kerberized_rw.plaintext_writer kerberized_rw)
     >>= fun () ->
@@ -227,7 +231,9 @@ module Server = struct
           writer
       =
       let monitor = Monitor.current () in
-      Monitor.try_with_or_error (fun () -> server_protocol ~peer reader writer)
+      Monitor.try_with_or_error
+        ~rest:`Log
+        (fun () -> server_protocol ~peer reader writer)
       >>= function
       | Error e -> return (handle_on_error ~monitor on_kerberos_error peer e)
       | Ok (Error (`Krb_error e)) ->
@@ -238,7 +244,9 @@ module Server = struct
         (* This can be logged in the servers [on_connection] *)
         return ()
       | Ok (Ok connection) ->
-        Monitor.try_with_or_error (fun () -> handle_client peer connection)
+        Monitor.try_with_or_error
+          ~rest:`Log
+          (fun () -> handle_client peer connection)
         >>= (function
           | Error e -> return (handle_on_error ~monitor on_handler_error peer e)
           | Ok () -> return ())
@@ -255,23 +263,27 @@ module Server = struct
           handle_client
           server_protocol
       =
-      Deferred.Or_error.try_with_join (fun () ->
-        Tcp.Server.create
-          ?max_connections
-          ?backlog
-          ?buffer_age_limit
-          (* It is never safe to set this to `Raise, since this would allow a single
-             misbehaving client to bring down the TCP server (via something as simple as
-             "connection reset by peer" *)
-          ~on_handler_error:`Ignore
-          where_to_listen
-          (handler_from_server_protocol
-             ?on_kerberos_error
-             ?on_handshake_error
-             ?on_handler_error
-             handle_client
-             server_protocol)
-        |> Deferred.ok)
+      Deferred.Or_error.try_with_join
+        ~run:
+          `Schedule
+        ~rest:`Log
+        (fun () ->
+           Tcp.Server.create
+             ?max_connections
+             ?backlog
+             ?buffer_age_limit
+             (* It is never safe to set this to `Raise, since this would allow a single
+                misbehaving client to bring down the TCP server (via something as simple as
+                "connection reset by peer" *)
+             ~on_handler_error:`Ignore
+             where_to_listen
+             (handler_from_server_protocol
+                ?on_kerberos_error
+                ?on_handshake_error
+                ?on_handler_error
+                handle_client
+                server_protocol)
+           |> Deferred.ok)
     ;;
 
     let krb_server_protocol ?on_connection krb_mode =
@@ -362,15 +374,18 @@ module Server = struct
           where_to_listen
           handle_client
       =
-      let on_connection =
+      let on_connection_mapped =
         Option.map on_connection ~f:(fun on_connection addr principal ->
           on_connection addr (Some principal))
       in
-      krb_server_protocol ?on_connection krb_mode
+      krb_server_protocol ?on_connection:on_connection_mapped krb_mode
       >>=? fun krb_server_protocol ->
       let server_protocol ~peer reader writer =
-        Deferred.Or_error.try_with (fun () ->
-          Reader.peek_bin_prot reader Protocol_version_header.any_magic_prefix)
+        Deferred.Or_error.try_with
+          ~run:
+            `Schedule
+          ~rest:`Log
+          (fun () -> Reader.peek_bin_prot reader Protocol_version_header.any_magic_prefix)
         >>| (function
           | Error _ | Ok `Eof -> None
           | Ok (`Ok x) -> x)
@@ -381,7 +396,14 @@ module Server = struct
         (* [`Other] is assumed to be an async rpc client here so that async rpc clients
            rolled prior to the addition of the magic number (c. 02-2017) will be able to
            connect. *)
-        | Some Rpc | None -> return (Ok (Krb_or_anon_conn.Anon (reader, writer)))
+        | Some Rpc | None ->
+          let ok = Ok (Krb_or_anon_conn.Anon (reader, writer)) in
+          (match on_connection with
+           | None -> return ok
+           | Some on_connection ->
+             (match on_connection peer None with
+              | `Accept -> return ok
+              | `Reject -> return (Error `Rejected_client)))
       in
       create_from_server_protocol
         ?max_connections

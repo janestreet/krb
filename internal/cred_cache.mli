@@ -32,6 +32,14 @@ val initialize_and_store
   -> Credentials.t list
   -> unit Deferred.Or_error.t
 
+(** check to see if the supplied credentials are already cached. If not, call [store]. All
+    this is done in a single Async cycle. *)
+val store_if_not_in_cache
+  :  t
+  -> request:Credentials.t
+  -> Credentials.t
+  -> unit Deferred.Or_error.t
+
 (** The returned [Credentials.t] are stored in [t].
 
     [tag_error_with_all_credentials] will decorate errors with a list of all credentials

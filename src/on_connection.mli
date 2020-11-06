@@ -8,7 +8,7 @@ module Acting_as : sig
   [@@deriving sexp_of]
 end
 
-val do_on_connection
+val run
   :  f:(Socket.Address.Inet.t -> 'a -> [ `Accept | `Reject ])
   -> acting_as:'a Acting_as.t
   -> peer_address:Socket.Address.Inet.t

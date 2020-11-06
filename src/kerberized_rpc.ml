@@ -7,7 +7,14 @@ module Transport = Kerberized_rpc_transport
 let collect_errors writer_monitor ~f =
   choose
     [ choice (Monitor.detach_and_get_next_error writer_monitor) (fun e -> Error e)
-    ; choice (try_with ~name:"Rpc.Connection.collect_errors" f) Fn.id
+    ; choice
+        (try_with
+           ~run:
+             `Schedule
+           ~rest:`Log
+           ~name:"Rpc.Connection.collect_errors"
+           f)
+        Fn.id
     ]
 ;;
 
@@ -401,7 +408,11 @@ module Connection = struct
       ?krb_mode
       where_to_connect
     >>=? fun t ->
-    Deferred.Or_error.try_with (fun () -> f t)
+    Deferred.Or_error.try_with
+      ~run:
+        `Schedule
+      ~rest:`Log
+      (fun () -> f t)
     >>= fun result -> Rpc.Connection.close t >>| fun () -> result
   ;;
 end

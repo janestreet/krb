@@ -29,7 +29,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     | `Eof ->
       raise_s
         [%message
-          "failed reading [Test_mode_protocol.Header]" (acting_as : _ Util.Acting_as.t)]
+          "failed reading [Test_mode_protocol.Header]"
+            (acting_as : _ On_connection.Acting_as.t)]
     | `Ok peer ->
       (match
          Protocol_version_header.negotiate ~allow_legacy_peer:false ~us:Header.v1 ~peer
@@ -41,7 +42,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           | `Eof ->
             raise_s
               [%message
-                "failed reading [Test_mode_protocol.Syn]" (acting_as : _ Util.Acting_as.t)]
+                "failed reading [Test_mode_protocol.Syn]"
+                  (acting_as : _ On_connection.Acting_as.t)]
           | `Ok that_principal -> return that_principal)
        | _ -> failwith "Negotiated unknown version number")
   ;;
@@ -52,7 +54,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     | `Eof ->
       raise_s
         [%message
-          "failed reading [Test_mode_protocol.Ack]" (acting_as : _ Util.Acting_as.t)]
+          "failed reading [Test_mode_protocol.Ack]"
+            (acting_as : _ On_connection.Acting_as.t)]
     | `Ok ack -> return ack
   ;;
 
@@ -66,7 +69,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     syn ~acting_as backend principal
     >>= fun other_principal ->
     let on_connection_result =
-      Util.do_on_connection
+      On_connection.run
         ~f:on_connection
         ~acting_as
         ~peer_address:peer_addr
@@ -100,8 +103,11 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     ;;
 
     let serve ?on_connection ~principal ~client_addr backend =
-      Deferred.Or_error.try_with (fun () ->
-        serve_exn ?on_connection ~principal ~peer_addr:client_addr backend)
+      Deferred.Or_error.try_with
+        ~run:
+          `Schedule
+        ~rest:`Log
+        (fun () -> serve_exn ?on_connection ~principal ~peer_addr:client_addr backend)
       >>| function
       | Ok result -> result
       | Error e -> Error (`Handshake_error e)
@@ -138,9 +144,13 @@ module Client = struct
     >>= fun (sock, reader, writer) ->
     return (Protocol_backend_async.create ~reader ~writer)
     >>=? fun backend ->
-    Deferred.Or_error.try_with_join (fun () ->
-      let server_addr = Socket.getpeername sock in
-      handshake ?on_connection ~principal ~server_addr backend)
+    Deferred.Or_error.try_with_join
+      ~run:
+        `Schedule
+      ~rest:`Log
+      (fun () ->
+         let server_addr = Socket.getpeername sock in
+         handshake ?on_connection ~principal ~server_addr backend)
     >>= function
     | Error e | Ok ((_ : Protocol.Connection.t), Error e) ->
       close_connection_via_reader_and_writer reader writer >>= fun () -> return (Error e)
@@ -157,16 +167,20 @@ module Client = struct
         ~principal
         where_to_connect
     =
-    Deferred.Or_error.try_with_join (fun () ->
-      connect_exn
-        ?buffer_age_limit
-        ?interrupt
-        ?reader_buffer_size
-        ?writer_buffer_size
-        ?timeout
-        ?on_connection
-        ~principal
-        where_to_connect)
+    Deferred.Or_error.try_with_join
+      ~run:
+        `Schedule
+      ~rest:`Log
+      (fun () ->
+         connect_exn
+           ?buffer_age_limit
+           ?interrupt
+           ?reader_buffer_size
+           ?writer_buffer_size
+           ?timeout
+           ?on_connection
+           ~principal
+           where_to_connect)
   ;;
 end
 
