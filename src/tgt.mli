@@ -50,3 +50,9 @@ val get_cached_tgt
   -> cred_cache:Cred_cache.t
   -> Principal.Name.t
   -> Internal.Credentials.t Deferred.Or_error.t
+
+(** Return number of active credential renewal loops, as started by calls to
+    [keep_valid_indefintely]. Note that it avoids creating a new loop for credentials that
+    are already being renewed, even if [keep_valid_indefinitely] is called multiple times
+    on the same cred cache with the same principal + keytab. *)
+val num_active_renewal_jobs : unit -> int

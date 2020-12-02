@@ -129,6 +129,13 @@ let renewal_jobs : [ `Wait of unit Or_error.t Ivar.t | `Renewing ] Renewal_key.T
   Renewal_key.Table.create ~size:0 ()
 ;;
 
+let num_active_renewal_jobs () =
+  Hashtbl.fold renewal_jobs ~init:0 ~f:(fun ~key:_ ~data count ->
+    match data with
+    | `Wait _ -> count
+    | `Renewing -> count + 1)
+;;
+
 let keep_valid_indefinitely_loop ~renewal_key ~refresh_every ~on_error =
   let { Renewal_key.cred_cache; keytab; principal } = renewal_key in
   let rec loop ?last_failed () =
