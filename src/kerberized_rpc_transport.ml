@@ -391,6 +391,7 @@ module Tcp = struct
         ?max_message_size
         ?max_connections
         ?backlog
+        ?drop_incoming_connections
         ?buffer_age_limit
         ?on_kerberos_error
         ?on_handshake_error
@@ -404,6 +405,7 @@ module Tcp = struct
     Kerberized_tcp.Internal.Server.create
       ?max_connections
       ?backlog
+      ?drop_incoming_connections
       ?buffer_age_limit
       ?on_kerberos_error
       ?on_handshake_error
@@ -419,6 +421,7 @@ module Tcp = struct
         ?max_message_size
         ?max_connections
         ?backlog
+        ?drop_incoming_connections
         ?buffer_age_limit
         ?on_kerberos_error
         ?on_handshake_error
@@ -446,6 +449,7 @@ module Tcp = struct
     Kerberized_tcp.Internal.Server.create_with_anon
       ?max_connections
       ?backlog
+      ?drop_incoming_connections
       ?buffer_age_limit
       ?on_kerberos_error
       ?on_handshake_error

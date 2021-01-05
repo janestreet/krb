@@ -20,7 +20,7 @@ open Import
 *)
 type t [@@deriving sexp_of]
 
-val of_cred_cache : Internal.Cred_cache.t -> t
+val of_cred_cache : Internal.Cred_cache.t -> t Deferred.Or_error.t
 val in_memory : unit -> t Deferred.Or_error.t
 val cred_cache : t -> Internal.Cred_cache.t
 

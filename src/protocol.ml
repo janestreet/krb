@@ -186,7 +186,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
      | Safe -> Auth_context.Safe.encode auth_context (Bigsubstring.create bs)
      | Priv -> Auth_context.Priv.encode auth_context (Bigsubstring.create bs))
     |> krb_error
-    >>|? fun x -> Backend.write_bin_prot backend Bigstring.Stable.V1.bin_writer_t x
+    >>|? fun x -> Backend.write_bin_prot_exn backend Bigstring.Stable.V1.bin_writer_t x
   ;;
 
   let write_field ~conn_type ~auth_context ~backend bin_writer value =
@@ -248,7 +248,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
       end
 
@@ -259,7 +259,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
       end
     end
@@ -267,7 +267,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     let handle_error ~backend tag result =
       Result.iter_error result ~f:(fun _ ->
         let e = Error.createf "This value will never be read" in
-        Backend.write_bin_prot
+        Backend.write_bin_prot_exn
           backend
           (Or_error.Stable.V2.bin_writer_t Unit.bin_writer_t)
           (Or_error.tag ~tag (Error e)));
@@ -479,7 +479,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields, sexp]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
       end
 
@@ -490,13 +490,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields, sexp]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
       end
 
       module Ap_rep = struct
         let write ~backend t =
-          Backend.write_bin_prot backend Auth_context.Ap_rep.bin_writer_t t
+          Backend.write_bin_prot_exn backend Auth_context.Ap_rep.bin_writer_t t
         ;;
 
         let read ~backend =
@@ -713,7 +713,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields, sexp]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
       end
 
@@ -725,13 +725,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields, sexp]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
       end
 
       module Ap_rep = struct
         let write ~backend t =
-          Backend.write_bin_prot backend Auth_context.Ap_rep.bin_writer_t t
+          Backend.write_bin_prot_exn backend Auth_context.Ap_rep.bin_writer_t t
         ;;
 
         let read ~backend =
@@ -970,7 +970,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             in
             (* All the sensitive bits of the KRB-CRED are encrypted, so we can send it
                safely over no matter the value of [conn_type]. *)
-            Backend.write_bin_prot backend Auth_context.Krb_cred.bin_writer_t krb_cred;
+            Backend.write_bin_prot_exn backend Auth_context.Krb_cred.bin_writer_t krb_cred;
             return ())
           else return ())
         >>=? fun () ->
@@ -1030,7 +1030,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields, sexp]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
       end
 
@@ -1042,13 +1042,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           }
         [@@deriving bin_io, fields, sexp]
 
-        let write ~backend t = Backend.write_bin_prot backend bin_writer_t t
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
       end
 
       module Ap_rep = struct
         let write ~backend t =
-          Backend.write_bin_prot backend Auth_context.Ap_rep.bin_writer_t t
+          Backend.write_bin_prot_exn backend Auth_context.Ap_rep.bin_writer_t t
         ;;
 
         let read ~backend =
@@ -1274,7 +1274,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   end
 
   let negotiate backend ~our_version =
-    Backend.write_bin_prot backend Header.V1.bin_writer_t our_version;
+    Backend.write_bin_prot_exn backend Header.V1.bin_writer_t our_version;
     read_bin_prot ~backend ~name:"Version header" Header.V1.bin_reader_t
     >>=? fun other_versions ->
     Protocol_version_header.negotiate
@@ -1363,7 +1363,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       negotiate backend ~our_version
     ;;
 
-    let negotiate_and_setup
+    let negotiate_and_setup_exn
           ?override_supported_versions
           ~on_connection
           ~client_cred_cache
@@ -1403,6 +1403,24 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             "Negotiated protocol version that I don't understand (THIS IS A BUG)"
               (version : int)
               ~i_understand:(Header.V1.versions : int list)]
+    ;;
+
+    let negotiate_and_setup
+          ?override_supported_versions
+          ~on_connection
+          ~client_cred_cache
+          ~accepted_conn_types
+          ~peer
+          backend
+      =
+      Monitor.try_with_join_or_error ~rest:`Raise (fun () ->
+        negotiate_and_setup_exn
+          ?override_supported_versions
+          ~on_connection
+          ~client_cred_cache
+          ~accepted_conn_types
+          ~peer
+          backend)
     ;;
   end
 end
@@ -1472,18 +1490,13 @@ module Client = struct
     let timeout = Time.diff finish_handshake_by (Time.now ()) in
     let peer = Socket.getpeername socket in
     let result =
-      Deferred.Or_error.try_with_join
-        ~run:
-          `Schedule
-        ~rest:`Log
-        (fun () ->
-           negotiate_and_setup
-             ?override_supported_versions
-             ~on_connection
-             ~client_cred_cache
-             ~accepted_conn_types
-             ~peer
-             backend)
+      negotiate_and_setup
+        ?override_supported_versions
+        ~on_connection
+        ~client_cred_cache
+        ~accepted_conn_types
+        ~peer
+        backend
     in
     let return_error err =
       let%bind () = close_connection_via_reader_and_writer reader writer in

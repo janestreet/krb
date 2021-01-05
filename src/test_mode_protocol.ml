@@ -23,8 +23,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   module P = Protocol.Make (Backend)
   module Connection = P.Connection
 
-  let syn ~acting_as backend this_principal =
-    Backend.write_bin_prot backend Header.bin_writer_t Header.v1;
+  let syn_exn ~acting_as backend this_principal =
+    Backend.write_bin_prot_exn backend Header.bin_writer_t Header.v1;
     match%bind Backend.read_bin_prot backend Header.bin_reader_t with
     | `Eof ->
       raise_s
@@ -37,7 +37,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
          |> ok_exn
        with
        | 1 ->
-         Backend.write_bin_prot backend Syn.bin_writer_t this_principal;
+         Backend.write_bin_prot_exn backend Syn.bin_writer_t this_principal;
          (match%bind Backend.read_bin_prot backend Syn.bin_reader_t with
           | `Eof ->
             raise_s
@@ -48,8 +48,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
        | _ -> failwith "Negotiated unknown version number")
   ;;
 
-  let ack ~acting_as backend v =
-    Backend.write_bin_prot backend Ack.bin_writer_t v;
+  let ack_exn ~acting_as backend v =
+    Backend.write_bin_prot_exn backend Ack.bin_writer_t v;
     match%bind Backend.read_bin_prot backend Ack.bin_reader_t with
     | `Eof ->
       raise_s
@@ -59,14 +59,14 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     | `Ok ack -> return ack
   ;;
 
-  let handshake
+  let handshake_exn
         ?(on_connection = fun _ _ -> `Accept)
         ~acting_as
         ~principal
         ~peer_addr
         backend
     =
-    syn ~acting_as backend principal
+    syn_exn ~acting_as backend principal
     >>= fun other_principal ->
     let on_connection_result =
       On_connection.run
@@ -75,7 +75,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         ~peer_address:peer_addr
         other_principal
     in
-    ack ~acting_as backend on_connection_result
+    ack_exn ~acting_as backend on_connection_result
     >>|? fun () ->
     let conn =
       Connection.create_for_test_mode
@@ -88,14 +88,20 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   ;;
 
   module Client = struct
-    let handshake ?on_connection ~principal ~server_addr =
-      handshake ?on_connection ~acting_as:Client ~principal ~peer_addr:server_addr
+    let handshake ?on_connection ~principal ~server_addr backend =
+      Deferred.Or_error.try_with_join ~run:`Now ~rest:`Log (fun () ->
+        handshake_exn
+          ?on_connection
+          ~acting_as:Client
+          ~principal
+          ~peer_addr:server_addr
+          backend)
     ;;
   end
 
   module Server = struct
     let serve_exn ?on_connection ~principal ~peer_addr backend =
-      handshake ?on_connection ~acting_as:Server ~principal ~peer_addr backend
+      handshake_exn ?on_connection ~acting_as:Server ~principal ~peer_addr backend
       >>| function
       | Error e -> Error (`Krb_error e)
       | Ok ((_ : Connection.t), Error (_ : Error.t)) -> Error `Rejected_client
@@ -144,13 +150,10 @@ module Client = struct
     >>= fun (sock, reader, writer) ->
     return (Protocol_backend_async.create ~reader ~writer)
     >>=? fun backend ->
-    Deferred.Or_error.try_with_join
-      ~run:
-        `Schedule
-      ~rest:`Log
-      (fun () ->
-         let server_addr = Socket.getpeername sock in
-         handshake ?on_connection ~principal ~server_addr backend)
+    Or_error.try_with (fun () -> Socket.getpeername sock)
+    |> Deferred.return
+    >>=? fun server_addr ->
+    handshake ?on_connection ~principal ~server_addr backend
     >>= function
     | Error e | Ok ((_ : Protocol.Connection.t), Error e) ->
       close_connection_via_reader_and_writer reader writer >>= fun () -> return (Error e)

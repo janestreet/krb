@@ -26,7 +26,7 @@ let create ~reader ~writer =
   else Ok { reader; writer }
 ;;
 
-let write_bin_prot (t : t) = Writer.write_bin_prot t.writer
+let write_bin_prot_exn (t : t) = Writer.write_bin_prot t.writer
 let read_bin_prot (t : t) = Reader.read_bin_prot t.reader
 let info t = Reader.fd t.reader |> Fd.info
 let local_inet t = Inet_of_fd.local_exn (Writer.fd t.writer)

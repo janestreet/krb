@@ -123,6 +123,7 @@ module Connection = struct
         ?heartbeat_config
         ?max_connections
         ?backlog
+        ?drop_incoming_connections
         ?buffer_age_limit
         ?on_kerberos_error
         ?(on_handshake_error = `Ignore)
@@ -138,6 +139,7 @@ module Connection = struct
       ?max_message_size
       ?max_connections
       ?backlog
+      ?drop_incoming_connections
       ?buffer_age_limit
       ?on_kerberos_error
       ~on_handshake_error
@@ -228,6 +230,7 @@ module Connection = struct
         ?heartbeat_config
         ?max_connections
         ?backlog
+        ?drop_incoming_connections
         ?buffer_age_limit
         ?on_kerberos_error
         ?(on_handshake_error = `Ignore)
@@ -243,6 +246,7 @@ module Connection = struct
       ?max_message_size
       ?max_connections
       ?backlog
+      ?drop_incoming_connections
       ?buffer_age_limit
       ?on_kerberos_error
       ~on_handshake_error

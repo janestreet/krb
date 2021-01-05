@@ -7,7 +7,8 @@ open! Import
 module type S = sig
   type t
 
-  val write_bin_prot : t -> 'a Bin_prot.Type_class.writer -> 'a -> unit
+  (** This can raise in certain backends if, e.g. the connection is closed. *)
+  val write_bin_prot_exn : t -> 'a Bin_prot.Type_class.writer -> 'a -> unit
 
   val read_bin_prot
     :  t

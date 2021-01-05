@@ -29,7 +29,11 @@ val with_connection
 
 (** Arguments passed through to [Tcp.Server.create].  See [Async.Tcp] for documentation *)
 type 'a async_tcp_server_args =
-  ?max_connections:int -> ?backlog:int -> ?buffer_age_limit:Writer.buffer_age_limit -> 'a
+  ?max_connections:int
+  -> ?backlog:int
+  -> ?drop_incoming_connections:bool
+  -> ?buffer_age_limit:Writer.buffer_age_limit
+  -> 'a
 
 module Server : sig
   type ('a, 'b) t = ('a, 'b) Tcp.Server.t

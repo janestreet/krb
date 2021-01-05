@@ -21,6 +21,7 @@ val ensure_valid
   -> Principal.Name.t
   -> unit Deferred.Or_error.t
 
+
 (** Ensure an initial tgt. Upon success an [ensure_tgt_valid] job is scheduled to run
     every [refresh_every]. If one of these background jobs fails, the [on_error] of the
     first caller determines how to handle the error. *)
@@ -29,6 +30,7 @@ val keep_valid_indefinitely
   -> ?on_error:[ `Ignore | `Raise | `Call of Error.t -> unit ]
   (** default: call [Log.Global.error] *)
   -> ?keytab:Keytab.Path.t
+  -> ?abort:unit Deferred.t
   -> cred_cache:Cred_cache.t
   -> Principal.Name.t
   -> unit Deferred.Or_error.t

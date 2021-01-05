@@ -95,14 +95,8 @@ module Client = struct
       | Kerberized accepted_conn_types ->
         (match cred_cache with
          | None -> Client_cred_cache.in_memory ()
-         | Some cred_cache ->
-           Deferred.Or_error.return (Client_cred_cache.of_cred_cache cred_cache))
+         | Some cred_cache -> Client_cred_cache.of_cred_cache cred_cache)
         >>=? fun client_cred_cache ->
-        let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
-        Cred_cache.principal cred_cache
-        >>=? fun principal_name ->
-        Tgt.keep_valid_indefinitely ~cred_cache ~keytab:User principal_name
-        >>=? fun () ->
         Protocol.Client.connect
           ?buffer_age_limit
           ?interrupt
@@ -195,7 +189,11 @@ let connect = Client.connect
 let with_connection = Client.with_connection
 
 type 'a async_tcp_server_args =
-  ?max_connections:int -> ?backlog:int -> ?buffer_age_limit:Writer.buffer_age_limit -> 'a
+  ?max_connections:int
+  -> ?backlog:int
+  -> ?drop_incoming_connections:bool
+  -> ?buffer_age_limit:Writer.buffer_age_limit
+  -> 'a
 
 module Server = struct
   type ('a, 'b) t = ('a, 'b) Tcp.Server.t
@@ -255,6 +253,7 @@ module Server = struct
     let create_from_server_protocol
           ?max_connections
           ?backlog
+          ?drop_incoming_connections
           ?buffer_age_limit
           ?on_kerberos_error
           ?on_handshake_error
@@ -271,6 +270,7 @@ module Server = struct
            Tcp.Server.create
              ?max_connections
              ?backlog
+             ?drop_incoming_connections
              ?buffer_age_limit
              (* It is never safe to set this to `Raise, since this would allow a single
                 misbehaving client to bring down the TCP server (via something as simple as
@@ -328,6 +328,7 @@ module Server = struct
     let create
           ?max_connections
           ?backlog
+          ?drop_incoming_connections
           ?buffer_age_limit
           ?on_kerberos_error
           ?on_handshake_error
@@ -347,6 +348,7 @@ module Server = struct
       create_from_server_protocol
         ?max_connections
         ?backlog
+        ?drop_incoming_connections
         ?buffer_age_limit
         ?on_kerberos_error
         ?on_handshake_error
@@ -365,6 +367,7 @@ module Server = struct
     let create_with_anon
           ?max_connections
           ?backlog
+          ?drop_incoming_connections
           ?buffer_age_limit
           ?on_kerberos_error
           ?on_handshake_error
@@ -408,6 +411,7 @@ module Server = struct
       create_from_server_protocol
         ?max_connections
         ?backlog
+        ?drop_incoming_connections
         ?buffer_age_limit
         ?on_kerberos_error
         ?on_handshake_error
@@ -421,6 +425,7 @@ module Server = struct
   let create
         ?max_connections
         ?backlog
+        ?drop_incoming_connections
         ?buffer_age_limit
         ?on_kerberos_error
         ?on_handshake_error
@@ -433,6 +438,7 @@ module Server = struct
     Internal.create
       ?max_connections
       ?backlog
+      ?drop_incoming_connections
       ?buffer_age_limit
       ?on_kerberos_error
       ?on_handshake_error

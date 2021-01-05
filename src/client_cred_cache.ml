@@ -15,7 +15,12 @@ let cred_cache = function
   | Double_cache { memory_cache; default_cache = _ } -> memory_cache
 ;;
 
-let of_cred_cache cred_cache = Single_cache cred_cache
+let of_cred_cache cred_cache =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind principal = Cred_cache.principal cred_cache in
+  let%bind () = Tgt.ensure_valid ~cred_cache ~keytab:User principal in
+  return (Single_cache cred_cache)
+;;
 
 let in_memory () =
   let%bind principal =
@@ -28,6 +33,9 @@ let in_memory () =
   let open Deferred.Or_error.Let_syntax in
   let%bind memory_cache = Cred_cache.in_memory_for_principal principal in
   let%bind default_cache = Internal.Cred_cache.default () in
+  let%bind () =
+    Tgt.keep_valid_indefinitely ~cred_cache:memory_cache ~keytab:User principal
+  in
   return (Double_cache { memory_cache; default_cache })
 ;;
 
