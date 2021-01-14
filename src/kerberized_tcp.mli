@@ -39,6 +39,8 @@ module Server : sig
   type ('a, 'b) t = ('a, 'b) Tcp.Server.t
 
 
+  (** Create a TCP server. Unlike an un-kerberized TCP server, this will read and write
+      some bytes from/to the underlying socket before returning a [t]. *)
   val create
     : (?on_kerberos_error:
         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
@@ -67,7 +69,7 @@ module Server : sig
 
            Furthermore, the error will propagate to the client as part of the connection
            establishment protocol.  This allows the client to get a more meaningful message
-           ("server rejected client principal" instead of something like "connection
+           ("server rejected client principal or address" instead of something like "connection
            closed").
        *)
        -> krb_mode:Mode.Server.t
@@ -140,6 +142,15 @@ module Internal : sig
         | Anon of (Reader.t * Writer.t)
     end
 
+    (** This is a bit misleading because it doesn't work with an unkerberized tcp client.
+        It is in an [Internal] module because it is useful for implementing
+        kerberized rpc [serve_with_anon].
+
+        The [create_with_anon] server peeks the first few bytes to check if the client is
+        sending a kerberos protocol header. If the unkerberized tcp client is expecting
+        the server to send some initial bytes, it will be waiting until something
+        presumably times out because the server is waiting for the client to send bytes
+        also. *)
     val create_with_anon : (Client_principal.t option, Krb_or_anon_conn.t) serve
   end
 end

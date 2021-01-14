@@ -58,6 +58,7 @@ module For_test : sig
       type t [@@deriving bin_io, sexp]
 
       val ap_request : t -> Bigstring.Stable.V1.t
+      val accepted_conn_types : t -> Conn_type_preference.t
     end
   end
 
@@ -66,6 +67,7 @@ module For_test : sig
       type t [@@deriving bin_io, sexp]
 
       val principal : t -> Principal.Name.t
+      val accepted_conn_types : t -> Conn_type_preference.t
     end
   end
 end
