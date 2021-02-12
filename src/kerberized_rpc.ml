@@ -471,10 +471,11 @@ let%test_module "Ensure test mode works" =
           let port = Tcp.Server.listening_on (Or_error.ok_exn server) in
           Connection.with_client
             ~on_connection:(fun server_address { server_principal } ->
-              if [%compare.equal: Principal.Name.t] service server_principal
-              && [%compare.equal: Socket.Address.Inet.t]
-                   server_address
-                   (Socket.Address.Inet.create (Unix.Inet_addr.of_string host) ~port)
+              if
+                [%compare.equal: Principal.Name.t] service server_principal
+                && [%compare.equal: Socket.Address.Inet.t]
+                     server_address
+                     (Socket.Address.Inet.create (Unix.Inet_addr.of_string host) ~port)
               then `Accept
               else `Reject)
             ~krb_mode

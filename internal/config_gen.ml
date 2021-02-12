@@ -94,11 +94,7 @@ let make ~default ~help_message =
            ~f:(fun (name, default, description) ->
              String.concat
                ("\n"
-                :: name
-                :: " (default "
-                :: Sexp.to_string default
-                :: ")"
-                :: description)))
+                :: name :: " (default " :: Sexp.to_string default :: ")" :: description)))
     ;;
 
     let help_message () =
