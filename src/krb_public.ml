@@ -7,6 +7,7 @@ module Stable = struct
 end
 
 open Import
+module Async_protocol = Async_protocol
 module Client_identity = Client_identity
 module Client_principal = Client_principal
 module Conn_type = Conn_type
@@ -16,6 +17,7 @@ module Internal = Internal
 module Kerberized_rw = Kerberized_rw
 module Server_key_source = Server_key_source
 module Keytab = Keytab
+module On_credential_forwarding_request = On_credential_forwarding_request
 module Mode = Mode
 module Persistent_rpc_client = Persistent_rpc_client
 module Principal = Principal

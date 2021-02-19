@@ -1,0 +1,1 @@
+include Protocol_with_test_mode_intf.Protocol_with_test_mode

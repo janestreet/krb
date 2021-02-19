@@ -31,3 +31,4 @@ let read_bin_prot (t : t) = Reader.read_bin_prot t.reader
 let info t = Reader.fd t.reader |> Fd.info
 let local_inet t = Inet_of_fd.local_exn (Writer.fd t.writer)
 let remote_inet t = Inet_of_fd.remote_exn (Writer.fd t.writer)
+let peek_bin_prot t = Reader.peek_bin_prot t.reader

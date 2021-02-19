@@ -5,68 +5,6 @@ module Credentials = Internal.Credentials
 module Debug = Internal.Debug
 module Keytab_entry = Internal.Keytab_entry
 
-(* From a [key_source], get the server's principal and a function to get the encryption
-   key *)
-module Endpoint = struct
-  let from_keytab ~principal keytab_source =
-    Keytab.load keytab_source
-    >>=? fun keytab ->
-    Keytab.validate keytab principal
-    >>|? fun () ->
-    let get_keytab () = Deferred.Or_error.return (`Service keytab) in
-    principal, get_keytab
-  ;;
-
-  let from_tgt cred_cache =
-    Internal.Cred_cache.get_cached_tgt cred_cache
-    >>|? fun tgt ->
-    let get_tgt () =
-      Internal.Cred_cache.get_cached_tgt cred_cache
-      >>|? fun tgt -> `User_to_user_via_tgt tgt
-    in
-    Credentials.client tgt, get_tgt
-  ;;
-
-  let create (key_source : Server_key_source.t) =
-    let open Deferred.Or_error.Let_syntax in
-    match key_source with
-    | Tgt ->
-      let%bind cred_cache = Cred_cache.default () in
-      from_tgt cred_cache
-    | Keytab (_, keytab_source) ->
-      let%bind principal = Server_key_source.principal key_source in
-      from_keytab ~principal keytab_source
-  ;;
-end
-
-module Server_protocol = struct
-  let test_mode ?on_connection principal =
-    Staged.stage (fun ~peer reader writer ->
-      Test_mode_protocol.Server.serve
-        ?on_connection
-        ~principal
-        ~client_addr:peer
-        reader
-        writer)
-  ;;
-
-  let kerberized_mode ?on_connection ~accepted_conn_types ~principal get_endpoint =
-    Staged.stage (fun ~peer reader writer ->
-      get_endpoint ()
-      >>= function
-      | Error e -> return (Error (`Krb_error e))
-      | Ok endpoint ->
-        Protocol.Server.serve
-          ?on_connection
-          ~accepted_conn_types
-          ~principal
-          endpoint
-          ~peer
-          reader
-          writer)
-  ;;
-end
-
 type 'a with_krb_args =
   ?cred_cache:Cred_cache.t
   -> ?on_connection:(Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
@@ -79,45 +17,14 @@ type 'a with_connect_args =
 
 module Client = struct
   module Internal = struct
-    let connect
-          ?buffer_age_limit
-          ?interrupt
-          ?reader_buffer_size
-          ?writer_buffer_size
-          ?timeout
-          ?override_supported_versions
-          ?cred_cache
-          ?on_connection
-          ~krb_mode
-          where_to_connect
-      =
-      match (krb_mode : Mode.Client.t) with
-      | Kerberized accepted_conn_types ->
-        (match cred_cache with
-         | None -> Client_cred_cache.in_memory ()
-         | Some cred_cache -> Client_cred_cache.of_cred_cache cred_cache)
-        >>=? fun client_cred_cache ->
-        Protocol.Client.connect
-          ?buffer_age_limit
-          ?interrupt
-          ?reader_buffer_size
-          ?writer_buffer_size
-          ?timeout
-          ?override_supported_versions
-          ?on_connection
-          ~client_cred_cache
-          ~accepted_conn_types
-          where_to_connect
-      | Test_with_principal principal ->
-        Test_mode_protocol.Client.connect
-          ?buffer_age_limit
-          ?interrupt
-          ?reader_buffer_size
-          ?writer_buffer_size
-          ?timeout
-          ?on_connection
-          ~principal
-          where_to_connect
+    let create_backend ~socket:_ ~tcp_reader ~tcp_writer =
+      Protocol_backend_async.create ~reader:tcp_reader ~writer:tcp_writer
+    ;;
+
+    let connect =
+      Kerberized_tcp_over_protocol.Client.connect_and_handshake
+        (module Async_protocol)
+        ~create_backend
     ;;
   end
 
@@ -146,7 +53,7 @@ module Client = struct
     >>=? fun connection ->
     Kerberized_rw.create connection
     >>| fun kerberized_rw ->
-    let server_principal = Protocol.Connection.peer_principal connection in
+    let server_principal = Async_protocol.Connection.peer_principal connection in
     Ok (kerberized_rw, { Server_principal.server_principal })
   ;;
 
@@ -198,56 +105,26 @@ type 'a async_tcp_server_args =
 module Server = struct
   type ('a, 'b) t = ('a, 'b) Tcp.Server.t
 
-  let handle_on_error ~monitor handle addr e =
-    let exn = Error.to_exn e in
-    try
-      match handle with
-      | `Ignore -> ()
-      | `Raise -> raise exn
-      | `Call f -> f addr exn
-    with
-    | exn -> Monitor.send_exn monitor exn
-  ;;
-
-  let write_to_log_global =
-    `Call
-      (fun remote_addr exn ->
-         Log.Global.sexp
-           ~level:`Error
-           [%message "Kerberos error" (remote_addr : Socket.Address.Inet.t) (exn : Exn.t)])
-  ;;
-
   module Internal = struct
     let handler_from_server_protocol
-          ?(on_kerberos_error = write_to_log_global)
-          ?(on_handshake_error = `Ignore)
-          ?(on_handler_error = `Raise)
+          ?on_kerberos_error
+          ?on_handshake_error
+          ?on_handler_error
           handle_client
           server_protocol
           peer
           reader
           writer
       =
-      let monitor = Monitor.current () in
-      Monitor.try_with_or_error
-        ~rest:`Log
-        (fun () -> server_protocol ~peer reader writer)
-      >>= function
-      | Error e -> return (handle_on_error ~monitor on_kerberos_error peer e)
-      | Ok (Error (`Krb_error e)) ->
-        return (handle_on_error ~monitor on_kerberos_error peer e)
-      | Ok (Error (`Handshake_error e)) ->
-        return (handle_on_error ~monitor on_handshake_error peer e)
-      | Ok (Error `Rejected_client) ->
-        (* This can be logged in the servers [on_connection] *)
-        return ()
-      | Ok (Ok connection) ->
-        Monitor.try_with_or_error
-          ~rest:`Log
-          (fun () -> handle_client peer connection)
-        >>= (function
-          | Error e -> return (handle_on_error ~monitor on_handler_error peer e)
-          | Ok () -> return ())
+      let backend_or_error = Protocol_backend_async.create ~reader ~writer in
+      Kerberized_tcp_over_protocol.Server.handler_from_server_protocol
+        ?on_kerberos_error
+        ?on_handshake_error
+        ?on_handler_error
+        handle_client
+        server_protocol
+        peer
+        backend_or_error
     ;;
 
     let create_from_server_protocol
@@ -287,24 +164,10 @@ module Server = struct
     ;;
 
     let krb_server_protocol ?on_connection krb_mode =
-      match (krb_mode : Mode.Server.t) with
-      | Kerberized (key_source, accepted_conn_types) ->
-        Endpoint.create key_source
-        >>=? fun (principal, get_endpoint) ->
-        let server_protocol =
-          Server_protocol.kerberized_mode
-            ?on_connection
-            ~accepted_conn_types
-            ~principal
-            get_endpoint
-          |> Staged.unstage
-        in
-        return (Ok server_protocol)
-      | Test_with_principal principal ->
-        let server_protocol =
-          Server_protocol.test_mode ?on_connection principal |> Staged.unstage
-        in
-        return (Ok server_protocol)
+      Kerberized_tcp_over_protocol.Server.krb_server_protocol
+        (module Async_protocol)
+        ?on_connection
+        krb_mode
     ;;
 
     let create_handler
@@ -360,7 +223,7 @@ module Server = struct
 
     module Krb_or_anon_conn = struct
       type t =
-        | Krb of Protocol.Connection.t
+        | Krb of Async_protocol.Connection.t
         | Anon of (Reader.t * Writer.t)
     end
 
@@ -377,36 +240,22 @@ module Server = struct
           where_to_listen
           handle_client
       =
-      let on_connection_mapped =
-        Option.map on_connection ~f:(fun on_connection addr principal ->
-          on_connection addr (Some principal))
-      in
-      krb_server_protocol ?on_connection:on_connection_mapped krb_mode
-      >>=? fun krb_server_protocol ->
-      let server_protocol ~peer reader writer =
-        Deferred.Or_error.try_with
-          ~run:
-            `Schedule
-          ~rest:`Log
-          (fun () -> Reader.peek_bin_prot reader Protocol_version_header.any_magic_prefix)
-        >>| (function
-          | Error _ | Ok `Eof -> None
-          | Ok (`Ok x) -> x)
-        >>= function
-        | Some Krb | Some Krb_test_mode ->
-          krb_server_protocol ~peer reader writer
-          >>|? fun conn -> Krb_or_anon_conn.Krb conn
-        (* [`Other] is assumed to be an async rpc client here so that async rpc clients
-           rolled prior to the addition of the magic number (c. 02-2017) will be able to
-           connect. *)
-        | Some Rpc | None ->
-          let ok = Ok (Krb_or_anon_conn.Anon (reader, writer)) in
-          (match on_connection with
-           | None -> return ok
-           | Some on_connection ->
-             (match on_connection peer None with
-              | `Accept -> return ok
-              | `Reject -> return (Error `Rejected_client)))
+      Kerberized_tcp_over_protocol.Server.krb_or_anon_server_protocol
+        (module Protocol_backend_async)
+        (module Async_protocol)
+        ~backend_peek_bin_prot:Protocol_backend_async.peek_bin_prot
+        ?on_connection
+        krb_mode
+      >>=? fun server_protocol ->
+      let server_protocol ~peer backend =
+        match%bind server_protocol ~peer backend with
+        | Error error -> Deferred.Result.fail error
+        | Ok (`Krb conn) -> Deferred.Result.return (Krb_or_anon_conn.Krb conn)
+        | Ok `Anon ->
+          Deferred.Result.return
+            (Krb_or_anon_conn.Anon
+               ( Protocol_backend_async.reader backend
+               , Protocol_backend_async.writer backend ))
       in
       create_from_server_protocol
         ?max_connections
@@ -449,7 +298,7 @@ module Server = struct
       (fun addr connection ->
          Kerberized_rw.create connection
          >>= fun kerberized_rw ->
-         let client_principal = Protocol.Connection.peer_principal connection in
+         let client_principal = Async_protocol.Connection.peer_principal connection in
          handle_client
            { Client_principal.client_principal }
            addr
@@ -468,6 +317,6 @@ end
 
 module Internal = struct
   module Server = Server.Internal
-  module Endpoint = Endpoint
+  module Endpoint = Kerberized_tcp_over_protocol.Server.Endpoint
   include Client.Internal
 end

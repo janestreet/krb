@@ -309,19 +309,19 @@ let of_connection
       "[Kerberized_rpc_transport.of_connection] got negative max message size: %d"
       max_message_size
       ();
-  match Protocol.Connection.protocol_version connection with
+  match Async_protocol.Connection.protocol_version connection with
   | `Test_mode | `Versioned 2 | `Versioned 3 | `Versioned 4 ->
     let transport =
-      match Protocol.Connection.auth_context connection with
+      match Async_protocol.Connection.auth_context connection with
       | `Test_mode ->
         (* Pretend that the connection type is [Auth] so there's no encoding or decoding. *)
-        let reader = Protocol.Connection.reader connection in
-        let writer = Protocol.Connection.writer connection in
+        let reader = Async_protocol.Connection.reader connection in
+        let writer = Async_protocol.Connection.writer connection in
         Rpc.Transport.of_reader_writer ~max_message_size reader writer
       | `Prod auth_context ->
-        let (conn_type : Conn_type.t) = Protocol.Connection.conn_type connection in
-        let reader = Protocol.Connection.reader connection in
-        let writer = Protocol.Connection.writer connection in
+        let (conn_type : Conn_type.t) = Async_protocol.Connection.conn_type connection in
+        let reader = Async_protocol.Connection.reader connection in
+        let writer = Async_protocol.Connection.writer connection in
         let encode_decode =
           match conn_type with
           | Auth -> None
@@ -373,9 +373,6 @@ let of_connection
 ;;
 
 module Tcp = struct
-  (* the point is that we only expose some functions. *)
-  module Krb_ops = Protocol.Connection
-
   let handle_krb_client ?max_message_size ?on_done_with_internal_buffer handle_client =
     Staged.stage (fun addr connection ->
       match%bind
@@ -522,8 +519,6 @@ end
 
 module Internal = struct
   module Tcp = struct
-    module Krb_ops = Protocol.Connection
-
     let client = Tcp.client_internal
   end
 end

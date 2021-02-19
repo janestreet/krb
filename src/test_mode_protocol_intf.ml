@@ -4,7 +4,7 @@ open Async
 module type S = sig
   type protocol_backend
 
-  module Connection : Protocol_intf.Connection
+  module Connection : T
 
   module Server : sig
     val serve
@@ -25,4 +25,13 @@ module type S = sig
       -> protocol_backend
       -> (Connection.t * unit Or_error.t) Deferred.Or_error.t
   end
+end
+
+module type Test_mode_protocol = sig
+  module type S = S
+
+  module Make (Backend : Protocol_backend_intf.S) :
+    S
+    with type protocol_backend = Backend.t
+     and type Connection.t = Protocol.Make(Backend).Connection.t
 end

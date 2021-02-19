@@ -1,7 +1,6 @@
 open! Core
 open! Async
-
-module type S = Test_mode_protocol_intf.S
+include Test_mode_protocol_intf
 
 module Header = struct
   type t = Protocol_version_header.t [@@deriving bin_io]
@@ -20,6 +19,8 @@ module Ack = struct
 end
 
 module Make (Backend : Protocol_backend_intf.S) = struct
+  type protocol_backend = Backend.t
+
   module P = Protocol.Make (Backend)
   module Connection = P.Connection
 
@@ -119,80 +120,4 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       | Error e -> Error (`Handshake_error e)
     ;;
   end
-end
-
-include Make (Protocol_backend_async)
-
-module Client = struct
-  include Client
-
-  let close_connection_via_reader_and_writer r w =
-    Writer.close w ~force_close:(Clock.after (sec 30.)) >>= fun () -> Reader.close r
-  ;;
-
-  let connect_exn
-        ?buffer_age_limit
-        ?interrupt
-        ?reader_buffer_size
-        ?writer_buffer_size
-        ?timeout
-        ?on_connection
-        ~principal
-        where_to_connect
-    =
-    Tcp.connect
-      ?timeout
-      ?buffer_age_limit
-      ?interrupt
-      ?reader_buffer_size
-      ?writer_buffer_size
-      where_to_connect
-    >>= fun (sock, reader, writer) ->
-    return (Protocol_backend_async.create ~reader ~writer)
-    >>=? fun backend ->
-    Or_error.try_with (fun () -> Socket.getpeername sock)
-    |> Deferred.return
-    >>=? fun server_addr ->
-    handshake ?on_connection ~principal ~server_addr backend
-    >>= function
-    | Error e | Ok ((_ : Protocol.Connection.t), Error e) ->
-      close_connection_via_reader_and_writer reader writer >>= fun () -> return (Error e)
-    | Ok (conn, Ok ()) -> Deferred.Or_error.return conn
-  ;;
-
-  let connect
-        ?buffer_age_limit
-        ?interrupt
-        ?reader_buffer_size
-        ?writer_buffer_size
-        ?timeout
-        ?on_connection
-        ~principal
-        where_to_connect
-    =
-    Deferred.Or_error.try_with_join
-      ~run:
-        `Schedule
-      ~rest:`Log
-      (fun () ->
-         connect_exn
-           ?buffer_age_limit
-           ?interrupt
-           ?reader_buffer_size
-           ?writer_buffer_size
-           ?timeout
-           ?on_connection
-           ~principal
-           where_to_connect)
-  ;;
-end
-
-module Server = struct
-  include Server
-
-  let serve ?on_connection ~principal ~client_addr reader writer =
-    match Protocol_backend_async.create ~reader ~writer with
-    | Error err -> return (Error (`Krb_error err))
-    | Ok backend -> serve ?on_connection ~principal ~client_addr backend
-  ;;
 end

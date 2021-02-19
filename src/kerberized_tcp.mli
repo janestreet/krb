@@ -91,7 +91,7 @@ module Internal : sig
          (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
        -> krb_mode:Mode.Client.t
        -> Socket.Address.Inet.t Tcp.Where_to_connect.t
-       -> Protocol.Connection.t Deferred.Or_error.t)
+       -> Async_protocol.Connection.t Deferred.Or_error.t)
         Tcp.with_connect_options
 
   module Endpoint : sig
@@ -99,7 +99,7 @@ module Internal : sig
       :  Server_key_source.t
       -> (Principal.t
           * (unit
-             -> [> `Service of Keytab.t | `User_to_user_via_tgt of Internal.Credentials.t ]
+             -> [ `Service of Keytab.t | `User_to_user_via_tgt of Internal.Credentials.t ]
                   Deferred.Or_error.t))
            Deferred.Or_error.t
   end
@@ -129,16 +129,16 @@ module Internal : sig
 
     val create_handler
       : ( Client_principal.t
-        , Protocol.Connection.t handle_client
+        , Async_protocol.Connection.t handle_client
           -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
                Deferred.Or_error.t )
           krb_args
 
-    val create : (Client_principal.t, Protocol.Connection.t) serve
+    val create : (Client_principal.t, Async_protocol.Connection.t) serve
 
     module Krb_or_anon_conn : sig
       type t =
-        | Krb of Protocol.Connection.t
+        | Krb of Async_protocol.Connection.t
         | Anon of (Reader.t * Writer.t)
     end
 

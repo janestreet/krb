@@ -1,5 +1,6 @@
 module Stable = struct
   open! Core.Core_stable
+  module Conn_type_preference = Conn_type_preference.Stable
 
   module Header = struct
     module V1 = struct
@@ -14,24 +15,54 @@ module Stable = struct
       ;;
     end
   end
+
+  module V4 = struct
+    module Mode = struct
+      type t =
+        | Service
+        | User_to_user of string
+      [@@deriving bin_io, sexp]
+    end
+
+    module Server_header = struct
+      type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; principal : Principal.Stable.Name.V1.t
+        ; endpoint : Mode.t
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+
+    module Client_header = struct
+      type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; ap_request : Bigstring.V1.t
+        ; forwarded_creds_ap_request : Bigstring.V1.t
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+  end
 end
 
 open Core
 open Async
 open Import
+include Protocol_intf
 module Auth_context = Internal.Auth_context
 module Credentials = Internal.Credentials
 module Flags = Internal.Krb_flags
 module Debug = Internal.Debug
-
-module type S = Protocol_intf.S
 
 let krb_error = Deferred.Result.map_error ~f:(fun e -> `Krb_error e)
 let handshake_error = Deferred.Result.map_error ~f:(fun e -> `Handshake_error e)
 let supported_versions = Stable.Header.V1.versions
 
 module Make (Backend : Protocol_backend_intf.S) = struct
+  type protocol_backend = Backend.t
+
   module Connection = struct
+    type protocol_backend = Backend.t
+
     type t =
       { backend : Backend.t
       ; auth_context : [ `Test_mode | `Prod of Auth_context.t ]
@@ -202,7 +233,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
   open Stable
   module Conn_type = Conn_type.Stable
-  module Conn_type_preference = Conn_type_preference.Stable
 
   let debug_log_connection_setup ~peer ~conn_type ~user_to_user ~acting_as =
     Debug.log_s (fun () ->
@@ -1008,7 +1038,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
        - If this all succeeds, the connection is established
     *)
     module Mode = struct
-      type t =
+      type t = Stable.V4.Mode.t =
         | Service
         | User_to_user of string
       [@@deriving bin_io, sexp]
@@ -1023,7 +1053,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     module Header = struct
       module Server = struct
-        type t =
+        type t = Stable.V4.Server_header.t =
           { accepted_conn_types : Conn_type_preference.V1.t
           ; principal : Principal.Stable.Name.V1.t
           ; endpoint : Mode.t
@@ -1035,7 +1065,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       end
 
       module Client = struct
-        type t =
+        type t = Stable.V4.Client_header.t =
           { accepted_conn_types : Conn_type_preference.V1.t
           ; ap_request : Bigstring.Stable.V1.t
           ; forwarded_creds_ap_request : Bigstring.Stable.V1.t
@@ -1289,7 +1319,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   ;;
 
   module Server = struct
-    let serve_exn
+    let handshake_exn
           ?(on_connection = fun _ _ -> `Accept)
           ~accepted_conn_types
           ~principal
@@ -1344,13 +1374,19 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         return (Error (`Handshake_error e))
     ;;
 
-    let serve ?on_connection ~accepted_conn_types ~principal ~peer endpoint backend =
+    let handshake ?on_connection ~accepted_conn_types ~principal ~peer endpoint backend =
       Deferred.Or_error.try_with
         ~run:
           `Schedule
         ~rest:`Log
         (fun () ->
-           serve_exn ?on_connection ~accepted_conn_types ~principal ~peer endpoint backend)
+           handshake_exn
+             ?on_connection
+             ~accepted_conn_types
+             ~principal
+             ~peer
+             endpoint
+             backend)
       >>| function
       | Error e -> Error (`Handshake_error e)
       | Ok (_ as result) -> result
@@ -1363,7 +1399,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       negotiate backend ~our_version
     ;;
 
-    let negotiate_and_setup_exn
+    let handshake_exn
           ?override_supported_versions
           ~on_connection
           ~client_cred_cache
@@ -1376,10 +1412,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       >>=? function
       | `Versioned 1 ->
         V1.Client.setup ~cred_cache ~accepted_conn_types ~on_connection ~peer backend
-        >>|? fun conn -> `Ok conn
       | `Versioned 2 ->
         V2.Client.setup ~cred_cache ~accepted_conn_types ~on_connection ~peer backend
-        >>|? fun conn -> `Ok conn
       | `Versioned 3 ->
         V3.Client.setup
           ~cred_cache
@@ -1388,7 +1422,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~forward_credentials_if_requested:false
           ~peer
           backend
-        >>|? fun conn -> `Ok conn
       | `Versioned 4 ->
         V4.Client.setup
           ~client_cred_cache
@@ -1396,7 +1429,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~on_connection
           ~peer
           backend
-        >>|? fun conn -> `Ok conn
       | `Versioned version ->
         Deferred.Or_error.error_s
           [%message
@@ -1405,7 +1437,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
               ~i_understand:(Header.V1.versions : int list)]
     ;;
 
-    let negotiate_and_setup
+    let handshake
           ?override_supported_versions
           ~on_connection
           ~client_cred_cache
@@ -1414,7 +1446,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           backend
       =
       Monitor.try_with_join_or_error ~rest:`Raise (fun () ->
-        negotiate_and_setup_exn
+        handshake_exn
           ?override_supported_versions
           ~on_connection
           ~client_cred_cache
@@ -1425,130 +1457,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   end
 end
 
-include Make (Protocol_backend_async)
-
-module Connection = struct
-  include Connection
-
-  let reader t = Protocol_backend_async.reader t.backend
-  let writer t = Protocol_backend_async.writer t.backend
-
-  let create_for_test_mode ~reader ~writer =
-    create_for_test_mode ~backend:(Protocol_backend_async.create ~reader ~writer |> ok_exn)
-  ;;
-end
-
-module Server = struct
-  include Server
-
-  let serve ?on_connection ~accepted_conn_types ~principal ~peer mode reader writer =
-    match Protocol_backend_async.create ~reader ~writer with
-    | Error err -> return (Error (`Krb_error err))
-    | Ok backend ->
-      serve ?on_connection ~accepted_conn_types ~principal ~peer mode backend
-  ;;
-end
-
-module Client = struct
-  include Client
-
-  (* This has to be this way because of the way we handle TCP
-     reader/writers. If we close the reader first, the writer ends up in an invalid
-     state. If it still has data to flush, the next attempted write will raise. By
-     making sure [Writer.close] finished, we know the [Writer.t] is flushed and it is
-     safe for us to close the reader. *)
-  let close_connection_via_reader_and_writer reader writer =
-    Writer.close writer ~force_close:(Clock.after (sec 30.))
-    >>= fun () -> Reader.close reader
-  ;;
-
-  let connect_exn
-        ?override_supported_versions
-        ?buffer_age_limit
-        ?interrupt
-        ?reader_buffer_size
-        ?writer_buffer_size
-        ?(timeout =
-          Time_ns.Span.to_span_float_round_nearest
-            Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
-        ?(on_connection = fun _ _ -> `Accept)
-        ~client_cred_cache
-        ~accepted_conn_types
-        where_to_connect
-    =
-    let finish_handshake_by = Time.add (Time.now ()) timeout in
-    Tcp.connect
-      ?buffer_age_limit
-      ?interrupt
-      ?reader_buffer_size
-      ?writer_buffer_size
-      ~timeout
-      where_to_connect
-    >>= fun (socket, reader, writer) ->
-    return (Protocol_backend_async.create ~reader ~writer)
-    >>=? fun backend ->
-    let timeout = Time.diff finish_handshake_by (Time.now ()) in
-    let peer = Socket.getpeername socket in
-    let result =
-      negotiate_and_setup
-        ?override_supported_versions
-        ~on_connection
-        ~client_cred_cache
-        ~accepted_conn_types
-        ~peer
-        backend
-    in
-    let return_error err =
-      let%bind () = close_connection_via_reader_and_writer reader writer in
-      Deferred.Or_error.fail
-        (Error.tag err ~tag:"The server logs might have more information.")
-    in
-    match%bind Clock.with_timeout timeout result with
-    | `Result (Ok (`Ok res)) -> Deferred.Or_error.return res
-    | `Result (Error error) -> return_error error
-    | `Timeout ->
-      return_error
-        (Error.create_s
-           [%message "Timed out doing Krb.Rpc handshake" (timeout : Time.Span.t)])
-  ;;
-
-  let connect
-        ?buffer_age_limit
-        ?interrupt
-        ?reader_buffer_size
-        ?writer_buffer_size
-        ?timeout
-        ?override_supported_versions
-        ?on_connection
-        ~client_cred_cache
-        ~accepted_conn_types
-        where_to_connect
-    =
-    Deferred.Or_error.try_with_join
-      ~run:
-        `Schedule
-      ~rest:`Log
-      (fun () ->
-         connect_exn
-           ?override_supported_versions
-           ?buffer_age_limit
-           ?interrupt
-           ?reader_buffer_size
-           ?writer_buffer_size
-           ?timeout
-           ?on_connection
-           ~client_cred_cache
-           ~accepted_conn_types
-           where_to_connect)
-  ;;
-end
-
 module For_test = struct
   module Client = struct
-    module V4_header = V4.Header.Client
+    module V4_header = Stable.V4.Client_header
   end
 
   module Server = struct
-    module V4_header = V4.Header.Server
+    module V4_header = Stable.V4.Server_header
   end
 end

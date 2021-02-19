@@ -27,4 +27,4 @@ type t
 val plaintext_reader : t -> Reader.t
 val plaintext_writer : t -> Writer.t
 val writer_closed_and_flushed : t -> unit Deferred.t
-val create : Protocol.Connection.t -> t Deferred.t
+val create : Async_protocol.Connection.t -> t Deferred.t

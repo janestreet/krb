@@ -157,10 +157,10 @@ let create_reader conn_type auth_context ~writer reader =
 ;;
 
 let create connection =
-  let conn_type = Protocol.Connection.conn_type connection in
-  let reader = Protocol.Connection.reader connection in
-  let writer = Protocol.Connection.writer connection in
-  match Protocol.Connection.auth_context connection with
+  let conn_type = Async_protocol.Connection.conn_type connection in
+  let reader = Async_protocol.Connection.reader connection in
+  let writer = Async_protocol.Connection.writer connection in
+  match Async_protocol.Connection.auth_context connection with
   | `Test_mode ->
     return
       { plaintext_reader = reader
