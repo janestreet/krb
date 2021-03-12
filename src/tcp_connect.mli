@@ -11,3 +11,13 @@ val connect_and_handshake
            -> 'conn Deferred.Or_error.t)
      -> 'conn Deferred.Or_error.t)
       Tcp.with_connect_options
+
+(** A helper function to [Tcp.connect_sock] and then call [handshake]. This one doesn't
+    create a reader and writer like the one above. *)
+val connect_sock_and_handshake
+  :  ?interrupt:unit Deferred.t
+  -> ?timeout:Time.Span.t
+  -> Socket.Address.Inet.t Tcp.Where_to_connect.t
+  -> handshake:
+       (socket:([ `Active ], Socket.Address.Inet.t) Socket.t -> 'conn Deferred.Or_error.t)
+  -> ('conn * ([ `Active ], Socket.Address.Inet.t) Socket.t) Deferred.Or_error.t

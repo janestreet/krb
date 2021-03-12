@@ -3,24 +3,19 @@ open! Async
 open! Import
 
 module Client = struct
-  let handshake
+  let handshake'
         (type backend conn)
         (module Protocol : Protocol_with_test_mode_intf.S
           with type protocol_backend = backend
            and type Connection.t = conn)
-        ~create_backend
         ?override_supported_versions
-        ?(on_connection = fun _ _ -> `Accept)
+        ~on_connection
+        ~backend
         ~krb_mode_with_client_cred_cache
-        ~socket
-        ~tcp_reader
-        ~tcp_writer
+        socket
     =
     let open Deferred.Or_error.Let_syntax in
     let peer = Socket.getpeername socket in
-    let%bind backend =
-      create_backend ~socket ~tcp_reader ~tcp_writer |> Deferred.return
-    in
     match krb_mode_with_client_cred_cache with
     | `Test_with_principal principal ->
       let%bind connection, on_connection_result =
@@ -40,6 +35,67 @@ module Client = struct
         ~accepted_conn_types
         ~peer
         backend
+  ;;
+
+  let handshake
+        (type backend conn)
+        (module Protocol : Protocol_with_test_mode_intf.S
+          with type protocol_backend = backend
+           and type Connection.t = conn)
+        ~create_backend
+        ?override_supported_versions
+        ?(on_connection = fun _ _ -> `Accept)
+        ~krb_mode_with_client_cred_cache
+        ~socket
+        ~tcp_reader
+        ~tcp_writer
+    =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind backend =
+      create_backend ~socket ~tcp_reader ~tcp_writer |> Deferred.return
+    in
+    handshake'
+      (module Protocol)
+      ?override_supported_versions
+      ~on_connection
+      ~backend
+      ~krb_mode_with_client_cred_cache
+      socket
+  ;;
+
+  let handshake_sock
+        (type backend conn)
+        (module Protocol : Protocol_with_test_mode_intf.S
+          with type protocol_backend = backend
+           and type Connection.t = conn)
+        ~create_backend
+        ?override_supported_versions
+        ?(on_connection = fun _ _ -> `Accept)
+        ~krb_mode_with_client_cred_cache
+        ~socket
+    =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind backend = create_backend ~socket |> Deferred.return in
+    handshake'
+      (module Protocol)
+      ?override_supported_versions
+      ~on_connection
+      ~backend
+      ~krb_mode_with_client_cred_cache
+      socket
+  ;;
+
+  let krb_mode_with_client_cred_cache ?cred_cache krb_mode =
+    let open Deferred.Or_error.Let_syntax in
+    match (krb_mode : Mode.Client.t) with
+    | Test_with_principal principal -> return (`Test_with_principal principal)
+    | Kerberized accepted_conn_types ->
+      let%bind client_cred_cache =
+        match cred_cache with
+        | None -> Client_cred_cache.in_memory ()
+        | Some cred_cache -> Client_cred_cache.of_cred_cache cred_cache
+      in
+      return (`Kerberized (accepted_conn_types, client_cred_cache))
   ;;
 
   let connect_and_handshake
@@ -63,15 +119,7 @@ module Client = struct
        any error while creating the client cred cache. *)
     let open Deferred.Or_error.Let_syntax in
     let%bind krb_mode_with_client_cred_cache =
-      match (krb_mode : Mode.Client.t) with
-      | Test_with_principal principal -> return (`Test_with_principal principal)
-      | Kerberized accepted_conn_types ->
-        let%bind client_cred_cache =
-          match cred_cache with
-          | None -> Client_cred_cache.in_memory ()
-          | Some cred_cache -> Client_cred_cache.of_cred_cache cred_cache
-        in
-        return (`Kerberized (accepted_conn_types, client_cred_cache))
+      krb_mode_with_client_cred_cache ?cred_cache krb_mode
     in
     Tcp_connect.connect_and_handshake
       ?buffer_age_limit
@@ -82,6 +130,39 @@ module Client = struct
       where_to_connect
       ~handshake:
         (handshake
+           (module Backend_protocol)
+           ~create_backend
+           ?override_supported_versions
+           ?on_connection
+           ~krb_mode_with_client_cred_cache)
+  ;;
+
+  let connect_sock_and_handshake
+        (type backend conn)
+        (module Backend_protocol : Protocol_with_test_mode_intf.S
+          with type protocol_backend = backend
+           and type Connection.t = conn)
+        ~create_backend
+        ?interrupt
+        ?timeout
+        ?override_supported_versions
+        ?cred_cache
+        ?on_connection
+        ~krb_mode
+        where_to_connect
+    =
+    (* we have to do this logic upfront so that we don't try to connect if there is
+       any error while creating the client cred cache. *)
+    let open Deferred.Or_error.Let_syntax in
+    let%bind krb_mode_with_client_cred_cache =
+      krb_mode_with_client_cred_cache ?cred_cache krb_mode
+    in
+    Tcp_connect.connect_sock_and_handshake
+      ?interrupt
+      ?timeout
+      where_to_connect
+      ~handshake:
+        (handshake_sock
            (module Backend_protocol)
            ~create_backend
            ?override_supported_versions

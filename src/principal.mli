@@ -48,7 +48,12 @@ module Name : sig
   (** accepts <username> or <service>/<hostname> *)
   val arg : t Command.Arg_type.t
 
+  (** Returns [None] if [t] is a [Service] *)
   val to_username : t -> Username.t option
+
+  (** Raises if [t] is a [Service] *)
+  val to_username_exn : t -> Username.t
+
   val service_on_this_host : service:string -> t
 end
 

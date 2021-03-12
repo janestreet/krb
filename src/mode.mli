@@ -51,6 +51,35 @@ module Server : sig
     -> t
 end
 
+(** The [*_with_auth_conn_type] modes are used for RPC transports that don't support
+    transforming data, and thus only support the [Auth] connection type. *)
+
+module Client_with_auth_conn_type : sig
+  type t = unit mode [@@deriving compare, hash, sexp_of]
+
+  val kerberized : unit -> t
+
+  val test_with_principal
+    :  ?test_principal:Principal.Name.t (** default: [User (Unix.getlogin ())] *)
+    -> unit
+    -> t
+
+  val full_mode : t -> Client.t
+end
+
+module Server_with_auth_conn_type : sig
+  type t = Server_key_source.t mode [@@deriving compare, hash, sexp_of]
+
+  val kerberized : key_source:Server_key_source.t -> t
+
+  val test_with_principal
+    :  ?test_principal:Principal.Name.t (** default: [User (Unix.getlogin ())] *)
+    -> unit
+    -> t
+
+  val full_mode : t -> Server.t
+end
+
 module Stable : sig
   module V4 : sig
     type nonrec 'a mode = 'a mode [@@deriving bin_io, compare, sexp]
@@ -62,5 +91,11 @@ module Stable : sig
     module Server : sig
       type t = Server.t [@@deriving compare, sexp]
     end
+
+    module Client_with_auth_conn_type :
+      Stable_without_comparator with type t = Client_with_auth_conn_type.t
+
+    module Server_with_auth_conn_type :
+      Stable_without_comparator with type t = Server_with_auth_conn_type.t
   end
 end

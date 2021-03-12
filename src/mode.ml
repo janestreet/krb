@@ -18,6 +18,14 @@ module Stable = struct
       type t = (Server_key_source.V2.t * Conn_type_preference.V1.t) mode
       [@@deriving compare, sexp]
     end
+
+    module Client_with_auth_conn_type = struct
+      type t = unit mode [@@deriving bin_io, compare, sexp]
+    end
+
+    module Server_with_auth_conn_type = struct
+      type t = Server_key_source.V2.t mode [@@deriving bin_io, compare, sexp]
+    end
   end
 end
 
@@ -53,4 +61,30 @@ module Server = struct
   ;;
 
   let test_with_principal = test_with_principal
+end
+
+module Client_with_auth_conn_type = struct
+  type t = unit mode [@@deriving compare, hash, sexp_of]
+
+  let kerberized () = Kerberized ()
+  let test_with_principal = test_with_principal
+
+  let full_mode t =
+    match (t : t) with
+    | Test_with_principal _ as t -> t
+    | Kerberized () -> Kerberized (Conn_type_preference.accept_only Conn_type.Auth)
+  ;;
+end
+
+module Server_with_auth_conn_type = struct
+  type t = Server_key_source.t mode [@@deriving compare, hash, sexp_of]
+
+  let kerberized ~key_source = Kerberized key_source
+  let test_with_principal = test_with_principal
+
+  let full_mode t =
+    match (t : t) with
+    | Test_with_principal _ as t -> t
+    | Kerberized s -> Kerberized (s, Conn_type_preference.accept_only Conn_type.Auth)
+  ;;
 end

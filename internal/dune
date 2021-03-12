@@ -1,4 +1,8 @@
 (library (name krb_internal_public) (public_name krb.internal)
- (libraries async core env_config hex_encode) (c_flags -I /usr/include/et)
- (library_flags -cclib -lkrb5 -cclib -lk5crypto) (c_names raw_stubs)
+ (libraries async core env_config hex_encode)
+ (c_flags (:standard (:include krb5-cflags.sexp)) (-I /usr/include/et))
+ (c_library_flags :standard (:include krb5-libs.sexp)) (c_names raw_stubs)
  (preprocess (pps ppx_jane)))
+
+(rule (targets krb5-cflags.sexp krb5-libs.sexp)
+ (deps (:first_dep config/discover.exe)) (action (run %{first_dep})))

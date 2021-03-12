@@ -39,20 +39,20 @@ module Client = struct
         ~krb_mode
         where_to_connect
     =
-    Internal.connect
-      ?buffer_age_limit
-      ?interrupt
-      ?reader_buffer_size
-      ?writer_buffer_size
-      ?timeout
-      ?cred_cache
-      ?override_supported_versions:None
-      ?on_connection
-      ~krb_mode
-      where_to_connect
-    >>=? fun connection ->
-    Kerberized_rw.create connection
-    >>| fun kerberized_rw ->
+    let%bind.Deferred.Or_error connection =
+      Internal.connect
+        ?buffer_age_limit
+        ?interrupt
+        ?reader_buffer_size
+        ?writer_buffer_size
+        ?timeout
+        ?cred_cache
+        ?override_supported_versions:None
+        ?on_connection
+        ~krb_mode
+        where_to_connect
+    in
+    let%map kerberized_rw = Kerberized_rw.create connection in
     let server_principal = Async_protocol.Connection.peer_principal connection in
     Ok (kerberized_rw, { Server_principal.server_principal })
   ;;

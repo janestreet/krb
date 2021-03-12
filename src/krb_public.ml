@@ -28,9 +28,12 @@ module Tgt = Tgt
 
 module Private = struct
   module Protocol = Protocol
+  module Protocol_with_test_mode = Protocol_with_test_mode
   module Protocol_backend_intf = Protocol_backend_intf
   module Test_mode_protocol = Test_mode_protocol
   module Client_cred_cache = Client_cred_cache
   module Currently_running_user = Currently_running_user
   module Kerberized_rpc_transport = Kerberized_rpc_transport
+  module Kerberized_tcp_over_protocol = Kerberized_tcp_over_protocol
+  module Kerberized_rpc_over_protocol = Kerberized_rpc_over_protocol
 end

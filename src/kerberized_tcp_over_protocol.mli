@@ -28,6 +28,28 @@ module Client : sig
     -> krb_mode:Mode.Client.t
     -> Socket.Address.Inet.t Tcp.Where_to_connect.t
     -> 'conn Deferred.Or_error.t
+
+  (** The clients should be very careful about doing any read/write operation directly on
+      the returned socket. For one, reading from the socket in [Priv] or [Safe] mode would
+      return encrypted data.
+
+      There are very rare cases when one might want to use the socket instead of the
+      connection. *)
+  val connect_sock_and_handshake
+    :  (module Protocol_with_test_mode.S
+         with type protocol_backend = 'backend
+          and type Connection.t = 'conn)
+    -> create_backend:
+         (socket:([ `Active ], Socket.Address.Inet.t) Socket.t -> 'backend Or_error.t)
+    -> ?interrupt:unit Deferred.t
+    -> ?timeout:Time.Span.t
+    -> ?override_supported_versions:int list
+    -> ?cred_cache:Cred_cache.t
+    -> ?on_connection:
+         (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+    -> krb_mode:Mode.Client.t
+    -> Socket.Address.Inet.t Tcp.Where_to_connect.t
+    -> ('conn * ([ `Active ], Socket.Address.Inet.t) Socket.t) Deferred.Or_error.t
 end
 
 module Server : sig

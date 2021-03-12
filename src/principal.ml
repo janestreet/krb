@@ -81,6 +81,15 @@ module Name = struct
       | Service _ -> None
     ;;
 
+    let to_username_exn = function
+      | User u -> Username.of_string u
+      | Service { service; hostname } ->
+        raise_s
+          [%sexp
+            "Could not convert service principal into username"
+          , { service : string; hostname : string }]
+    ;;
+
     let service_on_this_host ~service =
       Service { service; hostname = Core.Unix.gethostname () }
     ;;
