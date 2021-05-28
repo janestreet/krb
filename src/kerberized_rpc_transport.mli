@@ -15,9 +15,8 @@ module Tcp : sig
     -> (?on_kerberos_error:on_error
         -> ?on_handshake_error:on_error
         -> ?on_handler_error:on_error
-        -> ?on_connection:
-          (Socket.Address.Inet.t -> Client_principal.t -> [ `Accept | `Reject ])
         -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
+        -> authorize:Authorize.t
         -> where_to_listen:Tcp.Where_to_listen.inet
         -> krb_mode:Mode.Server.t
         -> (Socket.Address.Inet.t
@@ -33,9 +32,8 @@ module Tcp : sig
     -> (?on_kerberos_error:on_error
         -> ?on_handshake_error:on_error
         -> ?on_handler_error:on_error
-        -> ?on_connection:
-          (Socket.Address.Inet.t -> Client_principal.t option -> [ `Accept | `Reject ])
         -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
+        -> authorize:Authorize.Anon.t
         -> where_to_listen:Tcp.Where_to_listen.inet
         -> krb_mode:Mode.Server.t
         -> (Socket.Address.Inet.t
@@ -51,9 +49,8 @@ module Tcp : sig
     -> ?on_kerberos_error:on_error
     -> ?on_handshake_error:on_error
     -> ?on_handler_error:on_error
-    -> ?on_connection:
-         (Socket.Address.Inet.t -> Client_principal.t -> [ `Accept | `Reject ])
     -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
+    -> authorize:Authorize.t
     -> krb_mode:Mode.Server.t
     -> (Socket.Address.Inet.t
         -> Rpc.Transport.t
@@ -68,10 +65,9 @@ module Tcp : sig
     -> ?timeout:Time_ns.Span.t
     -> ?cred_cache:Cred_cache.t
     -> ?buffer_age_limit:Writer.buffer_age_limit
-    -> ?on_connection:
-         (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
     -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
     -> ?krb_mode:Mode.Client.t
+    -> authorize:Authorize.t
     -> Tcp.Where_to_connect.inet
     -> (Rpc.Transport.t * Async_protocol.Connection.t) Deferred.Or_error.t
 end
@@ -84,10 +80,9 @@ module Internal : sig
       -> ?timeout:Time_ns.Span.t
       -> ?cred_cache:Cred_cache.t
       -> ?buffer_age_limit:Writer.buffer_age_limit
-      -> ?on_connection:
-           (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
       -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
       -> ?krb_mode:Mode.Client.t
+      -> authorize:Authorize.t
       -> Async.Tcp.Where_to_connect.inet
       -> (Rpc.Transport.t * Async_protocol.Connection.t) Deferred.Or_error.t
   end

@@ -24,8 +24,7 @@ val create'
      -> ?implementations:(Server_principal.t -> _ Rpc.Connection.Client_implementations.t)
      -> ?description:Info.t
      -> ?cred_cache:Cred_cache.t
-     -> ?on_connection:
-       (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+     -> authorize:Authorize.t
      -> (unit -> Host_and_port.t Deferred.Or_error.t)
      -> t)
       Kerberized_rpc.async_rpc_args

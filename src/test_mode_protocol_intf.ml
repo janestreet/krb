@@ -8,8 +8,7 @@ module type S = sig
 
   module Server : sig
     val serve
-      :  ?on_connection:
-        (Socket.Address.Inet.t -> Client_principal.t -> [ `Accept | `Reject ])
+      :  authorize:Authorize.t
       -> principal:Principal.Name.t
       -> client_addr:Socket.Address.Inet.t
       -> protocol_backend
@@ -18,8 +17,7 @@ module type S = sig
 
   module Client : sig
     val handshake
-      :  ?on_connection:
-        (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+      :  authorize:Authorize.t
       -> principal:Principal.Name.t
       -> server_addr:Socket.Address.Inet.t
       -> protocol_backend

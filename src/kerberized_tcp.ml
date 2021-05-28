@@ -6,10 +6,7 @@ module Debug = Internal.Debug
 module Keytab_entry = Internal.Keytab_entry
 
 type 'a with_krb_args =
-  ?cred_cache:Cred_cache.t
-  -> ?on_connection:(Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
-  -> krb_mode:Mode.Client.t
-  -> 'a
+  ?cred_cache:Cred_cache.t -> authorize:Authorize.t -> krb_mode:Mode.Client.t -> 'a
 
 type 'a with_connect_args =
   (Socket.Address.Inet.t Tcp.Where_to_connect.t -> 'a) with_krb_args
@@ -34,8 +31,9 @@ module Client = struct
         ?reader_buffer_size
         ?writer_buffer_size
         ?timeout
+        ?time_source
         ?cred_cache
-        ?on_connection
+        ~authorize
         ~krb_mode
         where_to_connect
     =
@@ -46,9 +44,10 @@ module Client = struct
         ?reader_buffer_size
         ?writer_buffer_size
         ?timeout
+        ?time_source
         ?cred_cache
         ?override_supported_versions:None
-        ?on_connection
+        ~authorize
         ~krb_mode
         where_to_connect
     in
@@ -63,8 +62,9 @@ module Client = struct
         ?reader_buffer_size
         ?writer_buffer_size
         ?timeout
+        ?time_source
         ?cred_cache
-        ?on_connection
+        ~authorize
         ~krb_mode
         where_to_connect
         f
@@ -75,8 +75,9 @@ module Client = struct
       ?reader_buffer_size
       ?writer_buffer_size
       ?timeout
+      ?time_source
       ?cred_cache
-      ?on_connection
+      ~authorize
       ~krb_mode
       where_to_connect
     >>=? fun (kerberized_rw, server_principal) ->
@@ -163,10 +164,10 @@ module Server = struct
            |> Deferred.ok)
     ;;
 
-    let krb_server_protocol ?on_connection krb_mode =
+    let krb_server_protocol ~authorize krb_mode =
       Kerberized_tcp_over_protocol.Server.krb_server_protocol
         (module Async_protocol)
-        ?on_connection
+        ~authorize
         krb_mode
     ;;
 
@@ -174,11 +175,11 @@ module Server = struct
           ?on_kerberos_error
           ?on_handshake_error
           ?on_handler_error
-          ?on_connection
+          ~authorize
           ~krb_mode
           handle_client
       =
-      krb_server_protocol ?on_connection krb_mode
+      krb_server_protocol ~authorize krb_mode
       >>|? fun server_protocol ->
       handler_from_server_protocol
         ?on_kerberos_error
@@ -196,7 +197,7 @@ module Server = struct
           ?on_kerberos_error
           ?on_handshake_error
           ?on_handler_error
-          ?on_connection
+          ~authorize
           ~krb_mode
           where_to_listen
           handle_client
@@ -206,7 +207,7 @@ module Server = struct
           "Starting Kerberized server"
             (where_to_listen : Tcp.Where_to_listen.inet)
             (krb_mode : Mode.Server.t)]);
-      krb_server_protocol ?on_connection krb_mode
+      krb_server_protocol ~authorize krb_mode
       >>=? fun server_protocol ->
       create_from_server_protocol
         ?max_connections
@@ -235,7 +236,7 @@ module Server = struct
           ?on_kerberos_error
           ?on_handshake_error
           ?on_handler_error
-          ?on_connection
+          ~authorize
           ~krb_mode
           where_to_listen
           handle_client
@@ -244,7 +245,7 @@ module Server = struct
         (module Protocol_backend_async)
         (module Async_protocol)
         ~backend_peek_bin_prot:Protocol_backend_async.peek_bin_prot
-        ?on_connection
+        ~authorize
         krb_mode
       >>=? fun server_protocol ->
       let server_protocol ~peer backend =
@@ -279,7 +280,7 @@ module Server = struct
         ?on_kerberos_error
         ?on_handshake_error
         ?on_handler_error
-        ?on_connection
+        ~authorize
         ~krb_mode
         where_to_listen
         handle_client
@@ -292,7 +293,7 @@ module Server = struct
       ?on_kerberos_error
       ?on_handshake_error
       ?on_handler_error
-      ?on_connection
+      ~authorize
       ~krb_mode
       where_to_listen
       (fun addr connection ->

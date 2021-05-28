@@ -37,7 +37,7 @@ type 'a async_rpc_args =
 module Connection : sig
   type t = Rpc.Connection.t
 
-  type ('client_identity, 'principal, 'conn_state, 'r) krb_rpc_args :=
+  type ('client_identity, 'authorize, 'conn_state, 'r) krb_rpc_args :=
     ?on_kerberos_error:
       [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
     (** [on_kerberos_error] defaults to logging to [Log.Global.error]. See
@@ -45,21 +45,18 @@ module Connection : sig
     -> ?on_handshake_error:
          [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
     (** on_handshake_error defaults to [`Ignore] *)
-    -> ?on_connection:(Socket.Address.Inet.t -> 'principal -> [ `Accept | `Reject ])
-    (** [on_connection] gets passed the ip of the client and the principal the client is
-        authenticated as. [`Reject] will close the connection. The default is [Fn.const
-        `Accept]. *)
     -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
     (** [on_done_with_internal_buffer] determines if internal buffers are zeroed out after
         use. The default is [`Do_nothing]. *)
+    -> authorize:'authorize (** See the [Authorize] module for more docs *)
     -> implementations:'conn_state Rpc.Implementations.t
     -> initial_connection_state:
          ('client_identity -> Socket.Address.Inet.t -> t -> 'conn_state)
     -> 'r
 
-  type ('client_identity, 'principal, 'conn_state) server_args :=
+  type ('client_identity, 'authorize, 'conn_state) server_args :=
     ( 'client_identity
-    , 'principal
+    , 'authorize
     , 'conn_state
     , where_to_listen:Tcp.Where_to_listen.inet
     -> krb_mode:Mode.Server.t
@@ -70,7 +67,7 @@ module Connection : sig
       async_rpc_args
 
   (** [serve] starts an RPC server that provides the given [implementations] *)
-  val serve : (Client_identity.t, Client_principal.t, 'a) server_args
+  val serve : (Client_identity.t, Authorize.t, 'a) server_args
 
   (** [serve_with_anon] starts an RPC server that allows connections from both [Krb.Rpc]
       and [Async.Rpc] clients
@@ -84,14 +81,13 @@ module Connection : sig
       from [serve] to [serve_with_anon] can introduce problems, but such a change should
       rarely be necessary, if ever.
   *)
-  val serve_with_anon
-    : (Client_identity.t option, Client_principal.t option, 'a) server_args
+  val serve_with_anon : (Client_identity.t option, Authorize.Anon.t, 'a) server_args
 
   (** [create_handler] is the same as [serve], but it provides a handler that can be used
       with an externally created TCP server. *)
   val create_handler
     : ( Client_identity.t
-      , Client_principal.t
+      , Authorize.t
       , 'conn_state
       , Mode.Server.t
         -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
@@ -106,11 +102,6 @@ module Connection : sig
      -> ?cred_cache:Cred_cache.t (** This defaults to a new MEMORY cache. *)
      -> ?buffer_age_limit:[ `At_most of Time.Span.t | `Unlimited ]
      (** Uses the default value in [Writer.create] if not passed. *)
-     -> ?on_connection:
-       (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
-     (** [on_connection] gets passed the ip of the server and the principal the server is
-         running as. Allows checking that the server is who we expected it to be. The
-         default is [Fn.const `Accept]. *)
      -> ?on_credential_forwarding_request:
        (Server_principal.t -> On_credential_forwarding_request.t)
      (** [on_credential_forwarding_request] is called to validate a credential request
@@ -125,6 +116,7 @@ module Connection : sig
      (** [on_done_with_internal_buffer] determines if internal buffers are zeroed out after
          use. The default is [`Do_nothing]. *)
      -> ?krb_mode:Mode.Client.t (** default: [Mode.Client.kerberized] *)
+     -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
      -> Socket.Address.Inet.t Tcp.Where_to_connect.t
      -> 'a)
       async_rpc_args

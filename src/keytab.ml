@@ -153,17 +153,15 @@ let latest_keys keytab =
     >>| Result.return)
 ;;
 
-let add_spn t ~service ~hostname =
+let add_spn t spn =
   let%bind kvno, keyblocks = latest_keys t in
-  let spn = Principal.Name.Service { service; hostname } in
   let%bind new_principal = Principal.create spn in
   Deferred.Or_error.List.iter keyblocks ~f:(fun keyblock ->
     let%bind entry = Internal.Keytab_entry.create new_principal ~kvno keyblock in
     add_entry t entry)
 ;;
 
-let remove_spn t ~service ~hostname =
-  let spn = Principal.Name.Service { service; hostname } in
+let remove_spn t spn =
   let%bind entries = Internal.Keytab.entries t in
   let%bind to_remove =
     Deferred.Or_error.List.filter entries ~f:(fun entry ->

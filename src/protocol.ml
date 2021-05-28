@@ -305,7 +305,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     ;;
 
     module Server = struct
-      let do_setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend =
+      let do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
         let principal_s = Principal.to_string principal in
         (match endpoint with
          | `Service keytab -> return (Ok (Mode.Service, `Keytab keytab))
@@ -351,9 +351,9 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>| handle_error ~backend "failed to initiate auth_context"
         >>=? fun (auth_context, client) ->
         let client_principal_name = Principal.name client in
-        let on_connection_result =
-          On_connection.run
-            ~f:on_connection
+        let authorize_result =
+          Authorizer.run
+            ~authorize
             ~acting_as:Server
             ~peer_address:peer
             client_principal_name
@@ -363,7 +363,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~auth_context
           ~backend
           (Or_error.Stable.V2.bin_writer_t Unit.bin_writer_t)
-          on_connection_result
+          authorize_result
         >>=? fun () ->
         read_field' ~conn_type ~auth_context ~backend ~name:"Client ack" Unit.bin_reader_t
         >>|? fun () ->
@@ -376,11 +376,11 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned 1)
         in
-        conn, on_connection_result
+        conn, authorize_result
       ;;
 
-      let setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend =
-        do_setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend
+      let setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
+        do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
         >>| function
         | Error _ as error -> error
         | Ok ((_ : Connection.t), Error (_ : Error.t)) -> Error `Rejected_client
@@ -416,7 +416,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~remote_inet:(Backend.remote_inet backend)
       ;;
 
-      let setup ~cred_cache ~accepted_conn_types ~on_connection ~peer backend =
+      let setup ~cred_cache ~accepted_conn_types ~authorize ~peer backend =
         Header.Server.read ~backend
         >>=? fun server_header ->
         let accepted_conn_types =
@@ -438,8 +438,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Internal.Principal.of_string server_principal_s
         >>=? fun server_principal ->
         let server_principal_name = Principal.name server_principal in
-        On_connection.run
-          ~f:on_connection
+        Authorizer.run
+          ~authorize
           ~acting_as:Client
           ~peer_address:peer
           server_principal_name
@@ -536,7 +536,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     end
 
     module Server = struct
-      let do_setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend =
+      let do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
         (match endpoint with
          | `Service keytab -> return (Ok (Mode.Service, `Keytab keytab))
          | `User_to_user_via_tgt tgt ->
@@ -578,9 +578,9 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun ap_rep ->
         Header.Ap_rep.write ~backend ap_rep;
         let client_principal_name = Principal.name client in
-        let on_connection_result =
-          On_connection.run
-            ~f:on_connection
+        let authorize_result =
+          Authorizer.run
+            ~authorize
             ~acting_as:Server
             ~peer_address:peer
             client_principal_name
@@ -593,7 +593,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~auth_context
           ~backend
           (Or_error.Stable.V2.bin_writer_t Unit.bin_writer_t)
-          on_connection_result
+          authorize_result
         >>=? fun () ->
         read_field' ~conn_type ~auth_context ~backend ~name:"Client ack" Unit.bin_reader_t
         >>|? fun () ->
@@ -606,11 +606,11 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned 2)
         in
-        conn, on_connection_result
+        conn, authorize_result
       ;;
 
-      let setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend =
-        do_setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend
+      let setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
+        do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
         >>| function
         | Error _ as error -> error
         | Ok ((_ : Connection.t), Error (_ : Error.t)) -> Error `Rejected_client
@@ -647,7 +647,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~remote_inet:(Backend.remote_inet backend)
       ;;
 
-      let setup ~cred_cache ~accepted_conn_types ~on_connection ~peer backend =
+      let setup ~cred_cache ~accepted_conn_types ~authorize ~peer backend =
         Header.Server.read ~backend
         >>=? fun server_header ->
         Unstable.Conn_type_preference.negotiate
@@ -673,8 +673,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
         let server_principal_name = Header.Server.principal server_header in
-        On_connection.run
-          ~f:on_connection
+        Authorizer.run
+          ~authorize
           ~acting_as:Client
           ~peer_address:peer
           server_principal_name
@@ -773,7 +773,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     module Server = struct
       let do_setup
             ~accepted_conn_types
-            ~on_connection
+            ~authorize
             ~principal
             ~wants_forwarded_creds
             ~peer
@@ -822,9 +822,9 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun ap_rep ->
         Header.Ap_rep.write ~backend ap_rep;
         let client_principal_name = Principal.name client in
-        let on_connection_result =
-          On_connection.run
-            ~f:on_connection
+        let authorize_result =
+          Authorizer.run
+            ~authorize
             ~acting_as:Server
             ~peer_address:peer
             client_principal_name
@@ -837,7 +837,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~auth_context
           ~backend
           (Or_error.Stable.V2.bin_writer_t Unit.bin_writer_t)
-          on_connection_result
+          authorize_result
         >>=? fun () ->
         read_field' ~conn_type ~auth_context ~backend ~name:"Client ack" Unit.bin_reader_t
         >>=? fun () ->
@@ -879,12 +879,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned this_version)
         in
-        conn, on_connection_result
+        conn, authorize_result
       ;;
 
       let setup
             ~accepted_conn_types
-            ~on_connection
+            ~authorize
             ~principal
             ~wants_forwarded_creds
             ~peer
@@ -893,7 +893,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         =
         do_setup
           ~accepted_conn_types
-          ~on_connection
+          ~authorize
           ~principal
           ~wants_forwarded_creds
           ~peer
@@ -937,7 +937,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       let setup
             ~cred_cache
             ~accepted_conn_types
-            ~on_connection
+            ~authorize
             ~forward_credentials_if_requested
             ~peer
             backend
@@ -970,8 +970,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
         let server_principal_name = Header.Server.principal server_header in
-        On_connection.run
-          ~f:on_connection
+        Authorizer.run
+          ~authorize
           ~acting_as:Client
           ~peer_address:peer
           server_principal_name
@@ -1088,7 +1088,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     end
 
     module Server = struct
-      let do_setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend =
+      let do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
         (match endpoint with
          | `Service keytab -> return (Ok (Mode.Service, `Keytab keytab))
          | `User_to_user_via_tgt tgt ->
@@ -1152,9 +1152,9 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun ap_rep ->
         Header.Ap_rep.write ~backend ap_rep;
         let client_principal_name = Principal.name client in
-        let on_connection_result =
-          On_connection.run
-            ~f:on_connection
+        let authorize_result =
+          Authorizer.run
+            ~authorize
             ~acting_as:Server
             ~peer_address:peer
             client_principal_name
@@ -1167,7 +1167,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~auth_context
           ~backend
           (Or_error.Stable.V2.bin_writer_t Unit.bin_writer_t)
-          on_connection_result
+          authorize_result
         >>=? fun () ->
         read_field' ~conn_type ~auth_context ~backend ~name:"Client ack" Unit.bin_reader_t
         >>|? fun () ->
@@ -1181,11 +1181,11 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned this_version)
         in
-        conn, on_connection_result
+        conn, authorize_result
       ;;
 
-      let setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend =
-        do_setup ~accepted_conn_types ~on_connection ~principal ~peer endpoint backend
+      let setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
+        do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
         >>| function
         | Error _ as error -> error
         | Ok ((_ : Connection.t), Error (_ : Error.t)) -> Error `Rejected_client
@@ -1238,7 +1238,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         auth_context, ap_req, forwarded_creds_auth_context, forwarded_creds_ap_req
       ;;
 
-      let setup ~client_cred_cache ~accepted_conn_types ~on_connection ~peer backend =
+      let setup ~client_cred_cache ~accepted_conn_types ~authorize ~peer backend =
         Header.Server.read ~backend
         >>=? fun server_header ->
         Unstable.Conn_type_preference.negotiate
@@ -1270,8 +1270,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
         let server_principal_name = Header.Server.principal server_header in
-        On_connection.run
-          ~f:on_connection
+        Authorizer.run
+          ~authorize
           ~acting_as:Client
           ~peer_address:peer
           server_principal_name
@@ -1319,50 +1319,25 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   ;;
 
   module Server = struct
-    let handshake_exn
-          ?(on_connection = fun _ _ -> `Accept)
-          ~accepted_conn_types
-          ~principal
-          ~peer
-          endpoint
-          backend
-      =
+    let handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend =
       negotiate backend ~our_version:(Header.V1.value ())
       |> handshake_error
       >>=? function
       | `Versioned 1 ->
-        V1.Server.setup
-          ~accepted_conn_types
-          ~on_connection
-          ~principal
-          ~peer
-          endpoint
-          backend
+        V1.Server.setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
       | `Versioned 2 ->
-        V2.Server.setup
-          ~accepted_conn_types
-          ~on_connection
-          ~principal
-          ~peer
-          endpoint
-          backend
+        V2.Server.setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
       | `Versioned 3 ->
         V3.Server.setup
           ~accepted_conn_types
-          ~on_connection
+          ~authorize
           ~principal
           ~wants_forwarded_creds:false
           ~peer
           endpoint
           backend
       | `Versioned 4 ->
-        V4.Server.setup
-          ~accepted_conn_types
-          ~on_connection
-          ~principal
-          ~peer
-          endpoint
-          backend
+        V4.Server.setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
       | `Versioned version ->
         let e =
           Error.create_s
@@ -1374,19 +1349,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         return (Error (`Handshake_error e))
     ;;
 
-    let handshake ?on_connection ~accepted_conn_types ~principal ~peer endpoint backend =
+    let handshake ~authorize ~accepted_conn_types ~principal ~peer endpoint backend =
       Deferred.Or_error.try_with
         ~run:
           `Schedule
         ~rest:`Log
         (fun () ->
-           handshake_exn
-             ?on_connection
-             ~accepted_conn_types
-             ~principal
-             ~peer
-             endpoint
-             backend)
+           handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend)
       >>| function
       | Error e -> Error (`Handshake_error e)
       | Ok (_ as result) -> result
@@ -1401,7 +1370,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     let handshake_exn
           ?override_supported_versions
-          ~on_connection
+          ~authorize
           ~client_cred_cache
           ~accepted_conn_types
           ~peer
@@ -1411,24 +1380,19 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       negotiate ?override_supported_versions backend
       >>=? function
       | `Versioned 1 ->
-        V1.Client.setup ~cred_cache ~accepted_conn_types ~on_connection ~peer backend
+        V1.Client.setup ~cred_cache ~accepted_conn_types ~authorize ~peer backend
       | `Versioned 2 ->
-        V2.Client.setup ~cred_cache ~accepted_conn_types ~on_connection ~peer backend
+        V2.Client.setup ~cred_cache ~accepted_conn_types ~authorize ~peer backend
       | `Versioned 3 ->
         V3.Client.setup
           ~cred_cache
           ~accepted_conn_types
-          ~on_connection
+          ~authorize
           ~forward_credentials_if_requested:false
           ~peer
           backend
       | `Versioned 4 ->
-        V4.Client.setup
-          ~client_cred_cache
-          ~accepted_conn_types
-          ~on_connection
-          ~peer
-          backend
+        V4.Client.setup ~client_cred_cache ~accepted_conn_types ~authorize ~peer backend
       | `Versioned version ->
         Deferred.Or_error.error_s
           [%message
@@ -1439,7 +1403,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     let handshake
           ?override_supported_versions
-          ~on_connection
+          ~authorize
           ~client_cred_cache
           ~accepted_conn_types
           ~peer
@@ -1448,7 +1412,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       Monitor.try_with_join_or_error ~rest:`Raise (fun () ->
         handshake_exn
           ?override_supported_versions
-          ~on_connection
+          ~authorize
           ~client_cred_cache
           ~accepted_conn_types
           ~peer

@@ -393,8 +393,8 @@ module Tcp = struct
         ?on_kerberos_error
         ?on_handshake_error
         ?on_handler_error
-        ?on_connection
         ?on_done_with_internal_buffer
+        ~authorize
         ~where_to_listen
         ~krb_mode
         handle_client
@@ -407,7 +407,7 @@ module Tcp = struct
       ?on_kerberos_error
       ?on_handshake_error
       ?on_handler_error
-      ?on_connection
+      ~authorize
       ~krb_mode
       where_to_listen
       (Staged.unstage
@@ -423,8 +423,8 @@ module Tcp = struct
         ?on_kerberos_error
         ?on_handshake_error
         ?on_handler_error
-        ?on_connection
         ?on_done_with_internal_buffer
+        ~authorize
         ~where_to_listen
         ~krb_mode
         handle_client
@@ -451,7 +451,7 @@ module Tcp = struct
       ?on_kerberos_error
       ?on_handshake_error
       ?on_handler_error
-      ?on_connection
+      ~authorize
       ~krb_mode
       where_to_listen
       (fun addr connection ->
@@ -465,8 +465,8 @@ module Tcp = struct
         ?on_kerberos_error
         ?on_handshake_error
         ?on_handler_error
-        ?on_connection
         ?on_done_with_internal_buffer
+        ~authorize
         ~krb_mode
         handle_client
     =
@@ -474,7 +474,7 @@ module Tcp = struct
       ?on_kerberos_error
       ?on_handshake_error
       ?on_handler_error
-      ?on_connection
+      ~authorize
       ~krb_mode
       (handle_krb_client ?max_message_size ?on_done_with_internal_buffer handle_client
        |> Staged.unstage)
@@ -486,9 +486,9 @@ module Tcp = struct
         ?timeout
         ?cred_cache
         ?buffer_age_limit
-        ?on_connection
         ?on_done_with_internal_buffer
         ?krb_mode
+        ~authorize
         where_to_connect
     =
     let krb_mode =
@@ -501,8 +501,8 @@ module Tcp = struct
         ?timeout:(Option.map ~f:Time_ns.Span.to_span_float_round_nearest timeout)
         ?cred_cache
         ?override_supported_versions
-        ?on_connection
         ?buffer_age_limit
+        ~authorize
         ~krb_mode
         where_to_connect
     with

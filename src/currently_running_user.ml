@@ -9,6 +9,6 @@ let name () =
 ;;
 
 module Blocking = struct
-  let passwd () = Core.Unix.Passwd.getbyuid_exn (Core.Unix.geteuid ())
+  let passwd () = Core_unix.Passwd.getbyuid_exn (Core_unix.geteuid ())
   let name () = (passwd ()).name
 end

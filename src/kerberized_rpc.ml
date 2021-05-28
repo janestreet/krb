@@ -37,8 +37,8 @@ module Connection = struct
         ?buffer_age_limit
         ?on_kerberos_error
         ?(on_handshake_error = `Ignore)
-        ?on_connection
         ?on_done_with_internal_buffer
+        ~authorize
         ~implementations
         ~initial_connection_state
         ~where_to_listen
@@ -56,8 +56,8 @@ module Connection = struct
       (* A TCP handler error is an RPC handshake error, since the handler just does
          a handshake. *)
       ~on_handler_error:on_handshake_error
-      ?on_connection
       ?on_done_with_internal_buffer
+      ~authorize
       ~krb_mode
       ~where_to_listen
       (handle_client
@@ -88,8 +88,8 @@ module Connection = struct
         ?heartbeat_config
         ?on_kerberos_error
         ?(on_handshake_error = `Ignore)
-        ?on_connection
         ?on_done_with_internal_buffer
+        ~authorize
         ~implementations
         ~initial_connection_state
         krb_mode
@@ -99,8 +99,8 @@ module Connection = struct
       ?on_kerberos_error
       ~on_handshake_error
       ~on_handler_error:on_handshake_error
-      ?on_connection
       ?on_done_with_internal_buffer
+      ~authorize
       ~krb_mode
       (handle_client
          ?heartbeat_config
@@ -120,8 +120,8 @@ module Connection = struct
         ?buffer_age_limit
         ?on_kerberos_error
         ?(on_handshake_error = `Ignore)
-        ?on_connection
         ?on_done_with_internal_buffer
+        ~authorize
         ~implementations
         ~initial_connection_state
         ~where_to_listen
@@ -137,8 +137,8 @@ module Connection = struct
       ?on_kerberos_error
       ~on_handshake_error
       ~on_handler_error:on_handshake_error
-      ?on_connection
       ?on_done_with_internal_buffer
+      ~authorize
       ~krb_mode
       ~where_to_listen
       (handle_client_with_anon
@@ -161,10 +161,10 @@ module Connection = struct
           ?description
           ?cred_cache
           ?buffer_age_limit
-          ?on_connection
           ?on_credential_forwarding_request
           ?on_done_with_internal_buffer
           ?krb_mode
+          ~authorize
           where_to_connect
       =
       let finish_handshake_by = Time.add (Time.now ()) handshake_timeout in
@@ -173,10 +173,10 @@ module Connection = struct
         ~timeout:(Time_ns.Span.of_span_float_round_nearest handshake_timeout)
         ?cred_cache
         ?override_supported_versions
-        ?on_connection
         ?buffer_age_limit
         ?on_done_with_internal_buffer
         ?krb_mode
+        ~authorize
         where_to_connect
       >>=? fun (transport, conn) ->
       Kerberized_rpc_over_protocol.client
@@ -204,10 +204,10 @@ module Connection = struct
         ?description
         ?cred_cache
         ?buffer_age_limit
-        ?on_connection
         ?on_credential_forwarding_request
         ?on_done_with_internal_buffer
         ?krb_mode
+        ~authorize
         where_to_connect
         f
     =
@@ -219,10 +219,10 @@ module Connection = struct
       ?description
       ?cred_cache
       ?buffer_age_limit
-      ?on_connection
       ?on_credential_forwarding_request
       ?on_done_with_internal_buffer
       ?krb_mode
+      ~authorize
       where_to_connect
     >>=? fun t ->
     Deferred.Or_error.try_with
@@ -236,17 +236,24 @@ end
 
 let%test_module "Ensure test mode works" =
   (module struct
-    let serve ~implementations ~initial_connection_state ~where_to_listen ~krb_mode =
+    let serve
+          ~implementations
+          ~initial_connection_state
+          ~where_to_listen
+          ~krb_mode
+          ~authorize
+      =
       Connection.serve
         ~implementations
         ~initial_connection_state
         ~where_to_listen
         ~krb_mode
+        ~authorize
         ()
     ;;
 
-    let with_client ~on_connection ~krb_mode where_to_connect f =
-      Connection.with_client ~on_connection ~krb_mode where_to_connect f
+    let with_client ~authorize ~krb_mode where_to_connect f =
+      Connection.with_client ~authorize ~krb_mode where_to_connect f
     ;;
 
     let%test_unit "Test mode works" =

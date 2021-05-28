@@ -6,14 +6,7 @@ type 'a with_krb_args =
   ?cred_cache:Cred_cache.t
   (** This defaults to [Cred_cache.default] for a [TGT] key source and a new MEMORY cache
       for a [Keytab] key source. *)
-  -> ?on_connection:(Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
-  (** [on_connection] gets passed the ip of the server and principal the server is running
-      as. Allows checking that the server is who we expected it to be.
-
-      Similar functionality can be implemented by validating the [Principal.Name.t]
-      returned by [connect] yourself, however if [on_connection] returns [`Reject] the
-      client will be rejected early, without fully establishing a connection.
-  *)
+  -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
   -> krb_mode:Mode.Client.t
   -> 'a
 
@@ -59,19 +52,7 @@ module Server : sig
            function passed into [Server.create]. This includes any exceptions raised by the
            handler function as well as errors in de/encrypting messages. It defaults to
            [`Raise]. *)
-       -> ?on_connection:
-         (Socket.Address.Inet.t -> Client_principal.t -> [ `Accept | `Reject ])
-       (** [on_connection] gets passed the ip of the client and the principal the client
-           is authenticated as. [`Reject] will close the connection.
-
-           See the comment on the [on_connection] argument of [connect] for why you might
-           use this instead of validating the returned [Client_identity.t] yourself.
-
-           Furthermore, the error will propagate to the client as part of the connection
-           establishment protocol.  This allows the client to get a more meaningful message
-           ("server rejected client principal or address" instead of something like "connection
-           closed").
-       *)
+       -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
        -> krb_mode:Mode.Server.t
        -> Tcp.Where_to_listen.inet
        -> (Client_principal.t
@@ -87,8 +68,7 @@ module Internal : sig
   val connect
     : (?override_supported_versions:int list
        -> ?cred_cache:Cred_cache.t
-       -> ?on_connection:
-         (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+       -> authorize:Authorize.t
        -> krb_mode:Mode.Client.t
        -> Socket.Address.Inet.t Tcp.Where_to_connect.t
        -> Async_protocol.Connection.t Deferred.Or_error.t)
@@ -108,19 +88,19 @@ module Internal : sig
     type 'connection handle_client :=
       Socket.Address.Inet.t -> 'connection -> unit Deferred.t
 
-    type ('principal, 'r) krb_args :=
+    type ('authorize, 'r) krb_args :=
       ?on_kerberos_error:
         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
       -> ?on_handshake_error:
            [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
       -> ?on_handler_error:
            [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
-      -> ?on_connection:(Socket.Address.Inet.t -> 'principal -> [ `Accept | `Reject ])
+      -> authorize:'authorize
       -> krb_mode:Mode.Server.t
       -> 'r
 
-    type ('principal, 'connection) serve :=
-      ( 'principal
+    type ('authorize, 'connection) serve :=
+      ( 'authorize
       , Tcp.Where_to_listen.inet
       -> 'connection handle_client
       -> (Socket.Address.Inet.t, int) Server.t Deferred.Or_error.t )
@@ -128,13 +108,13 @@ module Internal : sig
         async_tcp_server_args
 
     val create_handler
-      : ( Client_principal.t
+      : ( Authorize.t
         , Async_protocol.Connection.t handle_client
           -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
                Deferred.Or_error.t )
           krb_args
 
-    val create : (Client_principal.t, Async_protocol.Connection.t) serve
+    val create : (Authorize.t, Async_protocol.Connection.t) serve
 
     module Krb_or_anon_conn : sig
       type t =
@@ -151,6 +131,6 @@ module Internal : sig
         the server to send some initial bytes, it will be waiting until something
         presumably times out because the server is waiting for the client to send bytes
         also. *)
-    val create_with_anon : (Client_principal.t option, Krb_or_anon_conn.t) serve
+    val create_with_anon : (Authorize.Anon.t, Krb_or_anon_conn.t) serve
   end
 end

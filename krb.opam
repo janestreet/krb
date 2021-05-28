@@ -12,13 +12,16 @@ build: [
 depends: [
   "ocaml" {>= "4.08.0"}
   "async"
+  "base"
   "core"
   "env_config"
   "hex_encode"
   "ppx_jane"
   "protocol_version_header"
+  "stdio"
   "username_kernel"
   "dune"                    {>= "2.0.0"}
+  "dune-configurator"
 ]
 synopsis: "A library for using Kerberos for both Rpc and Tcp communication"
 description: "

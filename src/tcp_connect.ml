@@ -39,6 +39,7 @@ let connect_and_handshake
       ?(timeout =
         Time_ns.Span.to_span_float_round_nearest
           Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
+      ?time_source
       where_to_connect
       ~handshake
   =
@@ -51,6 +52,7 @@ let connect_and_handshake
         ?reader_buffer_size
         ?writer_buffer_size
         ~timeout
+        ?time_source
         where_to_connect)
     ~handshake:(fun (socket, tcp_reader, tcp_writer) ->
       handshake ~socket ~tcp_reader ~tcp_writer)
@@ -63,13 +65,15 @@ let connect_sock_and_handshake
       ?(timeout =
         Time_ns.Span.to_span_float_round_nearest
           Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
+      ?time_source
       where_to_connect
       ~handshake
   =
   let open Deferred.Or_error.Let_syntax in
   connect_and_handshake'
     ~timeout
-    ~connect:(fun () -> Tcp.connect_sock ?interrupt ~timeout where_to_connect)
+    ~connect:(fun () ->
+      Tcp.connect_sock ?interrupt ~timeout ?time_source where_to_connect)
     ~handshake:(fun socket ->
       let%bind conn = handshake ~socket in
       return (conn, socket))

@@ -36,7 +36,7 @@ type 'a mode = 'a Stable.V4.mode =
   | Test_with_principal of Principal.Name.t
 [@@deriving compare, hash, sexp_of]
 
-let default_test_principal = lazy (Principal.Name.User (Core.Unix.getlogin ()))
+let default_test_principal = lazy (Principal.Name.User (Core_unix.getlogin ()))
 
 let test_with_principal ?(test_principal = force default_test_principal) () =
   Test_with_principal test_principal

@@ -55,6 +55,26 @@ let the_t : t Lazy_deferred.t =
     t)
 ;;
 
+(* This is the monitor that we run in when calling [Gc.add_finalizer]. [Gc.add_finalizer]
+   stores a reference to the current monitor. Because finalizers are GC roots, this
+   prevents the monitor from being GC'd until the finalizer is caller. It isn't too
+   difficult to get yourself into a situation where the monitor holds a reference to the
+   thing you are adding a finalizer for. When this happens, the finalizer will never run
+   and the monitor will never be GC'd.
+
+   To make the above a bit more concrete, take a look at
+   lib/krb/jane/test/bin/finalizer_memory_leak.ml *)
+let finalizer_monitor =
+  lazy
+    (let monitor = Monitor.create ~name:"Krb.Context_sequencer" () in
+     (* We have to detach the monitor so it doesn't hold onto a reference to it's parent
+        monitor (i.e. the current monitor when this lazy is forced). We don't expect any
+        of the finalizers to raise, nor do we really have anything useful to do with the
+        exception, so we just ignore it. *)
+     Monitor.detach_and_iter_errors monitor ~f:(ignore : exn -> unit);
+     monitor)
+;;
+
 (* This will raise if [f] raises or if forcing [the_t] raises. The latter can happen if
    you are in the kerberos sandbox. *)
 let enqueue_job_internal_exn ~f =
@@ -146,8 +166,9 @@ let enqueue_job_with_info ~info ~f =
 ;;
 
 let add_finalizer arg ~f:finalize =
-  Gc.add_finalizer_exn arg (fun arg ->
-    don't_wait_for (enqueue_job_exn ~f:(fun c -> finalize c arg)))
+  Scheduler.within ~monitor:(force finalizer_monitor) (fun () ->
+    Gc.add_finalizer_exn arg (fun arg ->
+      don't_wait_for (enqueue_job_exn ~f:(fun c -> finalize c arg))))
 ;;
 
 module Expert = struct

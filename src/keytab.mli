@@ -58,8 +58,8 @@ val entries_for_principal
   -> Internal.Keytab_entry.t list Deferred.Or_error.t
 
 val latest_keys : t -> (int * Internal.Keyblock.t list) Deferred.Or_error.t
-val add_spn : t -> service:string -> hostname:string -> unit Deferred.Or_error.t
-val remove_spn : t -> service:string -> hostname:string -> unit Deferred.Or_error.t
+val add_spn : t -> Principal.Name.t -> unit Deferred.Or_error.t
+val remove_spn : t -> Principal.Name.t -> unit Deferred.Or_error.t
 
 val add_entry
   :  t

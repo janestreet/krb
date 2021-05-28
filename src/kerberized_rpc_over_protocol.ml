@@ -251,25 +251,38 @@ module For_testing = struct
           failwith "impossible: only 1 implementation"
       in
       let service = Principal.Name.Service { service = "bogus"; hostname = "test" } in
+      let client = Principal.Name.User "me" in
+      let host = "127.0.0.1" in
       serve
         ~implementations
         ~initial_connection_state:(fun { Client_identity.client_principal; _ } _ _ ->
           client_principal)
         ~where_to_listen:Tcp.Where_to_listen.of_port_chosen_by_os
         ~krb_mode:(Mode.Test_with_principal service)
+        ~authorize:
+          (Authorize.create (fun (`Inet (client_host, _client_port)) client_principal ->
+             if
+               [%compare.equal: Principal.Name.t] client client_principal
+               && [%compare.equal: Unix.Inet_addr.t]
+                    client_host
+                    (Unix.Inet_addr.of_string host)
+             then `Accept
+             else `Reject))
       >>= fun server ->
       let test_with_client ~krb_mode ~expect =
-        let host = "127.0.0.1" in
         let port = Tcp.Server.listening_on (Or_error.ok_exn server) in
         with_client
-          ~on_connection:(fun server_address { Server_principal.server_principal } ->
-            if
-              [%compare.equal: Principal.Name.t] service server_principal
-              && [%compare.equal: Socket.Address.Inet.t]
-                   server_address
-                   (Socket.Address.Inet.create (Unix.Inet_addr.of_string host) ~port)
-            then `Accept
-            else `Reject)
+          ~authorize:
+            (Authorize.create (fun server_address server_principal ->
+               if
+                 [%compare.equal: Principal.Name.t] service server_principal
+                 && [%compare.equal: Socket.Address.Inet.t]
+                      server_address
+                      (Socket.Address.Inet.create
+                         (Unix.Inet_addr.of_string host)
+                         ~port)
+               then `Accept
+               else `Reject))
           ~krb_mode
           (Tcp.Where_to_connect.of_host_and_port { host; port })
           (fun connection ->
@@ -279,7 +292,6 @@ module For_testing = struct
                [%test_result: Principal.Name.t] principal ~expect)
         >>| ok_exn
       in
-      let principal = Principal.Name.User "me" in
-      test_with_client ~krb_mode:(Mode.Test_with_principal principal) ~expect:principal)
+      test_with_client ~krb_mode:(Mode.Test_with_principal client) ~expect:client)
   ;;
 end

@@ -21,10 +21,10 @@ module Client : sig
     -> ?reader_buffer_size:int
     -> ?writer_buffer_size:int
     -> ?timeout:Time.Span.t
+    -> ?time_source:Time_source.t
     -> ?override_supported_versions:int list
     -> ?cred_cache:Cred_cache.t
-    -> ?on_connection:
-         (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+    -> authorize:Authorize.t
     -> krb_mode:Mode.Client.t
     -> Socket.Address.Inet.t Tcp.Where_to_connect.t
     -> 'conn Deferred.Or_error.t
@@ -45,8 +45,7 @@ module Client : sig
     -> ?timeout:Time.Span.t
     -> ?override_supported_versions:int list
     -> ?cred_cache:Cred_cache.t
-    -> ?on_connection:
-         (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+    -> authorize:Authorize.t
     -> krb_mode:Mode.Client.t
     -> Socket.Address.Inet.t Tcp.Where_to_connect.t
     -> ('conn * ([ `Active ], Socket.Address.Inet.t) Socket.t) Deferred.Or_error.t
@@ -85,8 +84,7 @@ module Server : sig
     :  (module Protocol_with_test_mode_intf.S
          with type protocol_backend = 'backend
           and type Connection.t = 'conn)
-    -> ?on_connection:
-         (Socket.Address.Inet.t -> Client_principal.t -> [ `Accept | `Reject ])
+    -> authorize:Authorize.t
     -> Mode.Server.t
     -> (peer:Socket.Address.Inet.t
         -> 'backend
@@ -105,8 +103,7 @@ module Server : sig
          ('backend
           -> Protocol_version_header.Known_protocol.t option Bin_prot.Type_class.reader
           -> [ `Eof | `Ok of Protocol_version_header.Known_protocol.t option ] Deferred.t)
-    -> ?on_connection:
-         (Socket.Address.Inet.t -> Client_principal.t option -> [ `Accept | `Reject ])
+    -> authorize:Authorize.Anon.t
     -> Mode.Server.t
     -> (peer:Socket.Address.Inet.t
         -> 'backend

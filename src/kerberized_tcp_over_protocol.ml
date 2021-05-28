@@ -9,7 +9,7 @@ module Client = struct
           with type protocol_backend = backend
            and type Connection.t = conn)
         ?override_supported_versions
-        ~on_connection
+        ~authorize
         ~backend
         ~krb_mode_with_client_cred_cache
         socket
@@ -18,19 +18,19 @@ module Client = struct
     let peer = Socket.getpeername socket in
     match krb_mode_with_client_cred_cache with
     | `Test_with_principal principal ->
-      let%bind connection, on_connection_result =
+      let%bind connection, authorize_result =
         Protocol.Test_mode.Client.handshake
-          ~on_connection
+          ~authorize
           ~principal
           ~server_addr:peer
           backend
       in
-      let%map () = Deferred.return on_connection_result in
+      let%map () = Deferred.return authorize_result in
       connection
     | `Kerberized (accepted_conn_types, client_cred_cache) ->
       Protocol.Client.handshake
         ?override_supported_versions
-        ~on_connection
+        ~authorize
         ~client_cred_cache
         ~accepted_conn_types
         ~peer
@@ -44,7 +44,7 @@ module Client = struct
            and type Connection.t = conn)
         ~create_backend
         ?override_supported_versions
-        ?(on_connection = fun _ _ -> `Accept)
+        ~authorize
         ~krb_mode_with_client_cred_cache
         ~socket
         ~tcp_reader
@@ -57,7 +57,7 @@ module Client = struct
     handshake'
       (module Protocol)
       ?override_supported_versions
-      ~on_connection
+      ~authorize
       ~backend
       ~krb_mode_with_client_cred_cache
       socket
@@ -70,7 +70,7 @@ module Client = struct
            and type Connection.t = conn)
         ~create_backend
         ?override_supported_versions
-        ?(on_connection = fun _ _ -> `Accept)
+        ~authorize
         ~krb_mode_with_client_cred_cache
         ~socket
     =
@@ -79,7 +79,7 @@ module Client = struct
     handshake'
       (module Protocol)
       ?override_supported_versions
-      ~on_connection
+      ~authorize
       ~backend
       ~krb_mode_with_client_cred_cache
       socket
@@ -109,9 +109,10 @@ module Client = struct
         ?reader_buffer_size
         ?writer_buffer_size
         ?timeout
+        ?time_source
         ?override_supported_versions
         ?cred_cache
-        ?on_connection
+        ~authorize
         ~krb_mode
         where_to_connect
     =
@@ -127,13 +128,14 @@ module Client = struct
       ?reader_buffer_size
       ?writer_buffer_size
       ?timeout
+      ?time_source
       where_to_connect
       ~handshake:
         (handshake
            (module Backend_protocol)
            ~create_backend
            ?override_supported_versions
-           ?on_connection
+           ~authorize
            ~krb_mode_with_client_cred_cache)
   ;;
 
@@ -147,7 +149,7 @@ module Client = struct
         ?timeout
         ?override_supported_versions
         ?cred_cache
-        ?on_connection
+        ~authorize
         ~krb_mode
         where_to_connect
     =
@@ -166,7 +168,7 @@ module Client = struct
            (module Backend_protocol)
            ~create_backend
            ?override_supported_versions
-           ?on_connection
+           ~authorize
            ~krb_mode_with_client_cred_cache)
   ;;
 end
@@ -252,7 +254,7 @@ module Server = struct
     | Ok (Error (`Handshake_error e)) ->
       return (handle_on_error ~monitor on_handshake_error peer e)
     | Ok (Error `Rejected_client) ->
-      (* This can be logged in the servers [on_connection] *)
+      (* This can be logged in the servers [authorize] *)
       return ()
     | Ok (Ok connection) ->
       Monitor.try_with_or_error
@@ -268,7 +270,7 @@ module Server = struct
         (module Protocol : Protocol_with_test_mode_intf.S
           with type protocol_backend = backend
            and type Connection.t = conn)
-        ?on_connection
+        ~authorize
         krb_mode
     =
     match (krb_mode : Mode.Server.t) with
@@ -281,7 +283,7 @@ module Server = struct
         | Error e -> return (Error (`Krb_error e))
         | Ok endpoint ->
           Protocol.Server.handshake
-            ?on_connection
+            ~authorize
             ~accepted_conn_types
             ~principal
             endpoint
@@ -291,11 +293,7 @@ module Server = struct
       return (Ok server_protocol)
     | Test_with_principal principal ->
       let server_protocol ~peer backend =
-        Protocol.Test_mode.Server.serve
-          ?on_connection
-          ~principal
-          ~client_addr:peer
-          backend
+        Protocol.Test_mode.Server.serve ~authorize ~principal ~client_addr:peer backend
       in
       return (Ok server_protocol)
   ;;
@@ -307,14 +305,11 @@ module Server = struct
           with type protocol_backend = backend
            and type Connection.t = conn)
         ~backend_peek_bin_prot
-        ?on_connection
+        ~authorize
         krb_mode
     =
-    let on_connection_mapped =
-      Option.map on_connection ~f:(fun on_connection addr principal ->
-        on_connection addr (Some principal))
-    in
-    krb_server_protocol (module Protocol) ?on_connection:on_connection_mapped krb_mode
+    let authorize_mapped = Authorize.krb_of_anon authorize in
+    krb_server_protocol (module Protocol) ~authorize:authorize_mapped krb_mode
     >>=? fun krb_server_protocol ->
     let server_protocol ~peer backend =
       Deferred.Or_error.try_with
@@ -333,12 +328,9 @@ module Server = struct
          connect. *)
       | Some Rpc | None ->
         let ok = Ok `Anon in
-        (match on_connection with
-         | None -> return ok
-         | Some on_connection ->
-           (match on_connection peer None with
-            | `Accept -> return ok
-            | `Reject -> return (Error `Rejected_client)))
+        (match Authorize.For_internal_use.Anon.authorize authorize peer None with
+         | `Accept -> return ok
+         | `Reject -> return (Error `Rejected_client))
     in
     Deferred.Result.return server_protocol
   ;;

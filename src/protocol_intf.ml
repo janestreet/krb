@@ -33,7 +33,7 @@ module type Connection = sig
 end
 
 type 'a with_serve_krb_args =
-  ?on_connection:(Socket.Address.Inet.t -> Client_principal.t -> [ `Accept | `Reject ])
+  authorize:Authorize.t
   -> accepted_conn_types:Conn_type_preference.t
   -> principal:Principal.t
   -> peer:Socket.Address.Inet.t
@@ -61,8 +61,7 @@ module type S = sig
         sending/receiving user data. *)
     val handshake
       :  ?override_supported_versions:int list
-      -> on_connection:
-           (Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+      -> authorize:Authorize.t
       -> client_cred_cache:Client_cred_cache.t
       -> accepted_conn_types:Conn_type_preference.t
       -> peer:Socket.Address.Inet.t

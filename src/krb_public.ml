@@ -8,6 +8,7 @@ end
 
 open Import
 module Async_protocol = Async_protocol
+module Authorize = Authorize
 module Client_identity = Client_identity
 module Client_principal = Client_principal
 module Conn_type = Conn_type

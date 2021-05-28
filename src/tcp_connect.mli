@@ -17,6 +17,7 @@ val connect_and_handshake
 val connect_sock_and_handshake
   :  ?interrupt:unit Deferred.t
   -> ?timeout:Time.Span.t
+  -> ?time_source:[> read ] Time_source.T1.t
   -> Socket.Address.Inet.t Tcp.Where_to_connect.t
   -> handshake:
        (socket:([ `Active ], Socket.Address.Inet.t) Socket.t -> 'conn Deferred.Or_error.t)

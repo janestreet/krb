@@ -91,7 +91,7 @@ module Name = struct
     ;;
 
     let service_on_this_host ~service =
-      Service { service; hostname = Core.Unix.gethostname () }
+      Service { service; hostname = Core_unix.gethostname () }
     ;;
   end
 

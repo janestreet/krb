@@ -23,7 +23,7 @@ let create'
       ?implementations
       ?description
       ?cred_cache
-      ?on_connection
+      ~authorize
       get_addr
   =
   create
@@ -40,7 +40,7 @@ let create'
         ?implementations
         ?description
         ?cred_cache
-        ?on_connection
+        ~authorize
         ~krb_mode
         (Tcp.Where_to_connect.of_host_and_port ?bind_to_address { host; port }))
     get_addr

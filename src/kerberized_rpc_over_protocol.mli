@@ -46,10 +46,11 @@ module For_testing : sig
           -> Principal.Name.t)
     -> where_to_listen:Tcp.Where_to_listen.inet
     -> krb_mode:'mode Mode.mode
+    -> authorize:Authorize.t
     -> Tcp.Server.inet Deferred.Or_error.t
 
   type 'mode with_client :=
-    on_connection:(Socket.Address.Inet.t -> Server_principal.t -> [ `Accept | `Reject ])
+    authorize:Authorize.t
     -> krb_mode:'mode Mode.mode
     -> Tcp.Where_to_connect.inet
     -> (Rpc.Connection.t -> unit Deferred.t)
