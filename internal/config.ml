@@ -1,10 +1,10 @@
 open! Core
 
 let default =
-  { Config_gen.realm = None
+  { Config_gen.pre_v5_assumed_realm = None
   ; host_keytab_path = None
   ; user_keytab_dir_template = None
-  ; domain_name = None
+  ; default_domain = None
   ; debug_log_config = None
   ; verbose_errors = None
   ; am_sandboxed = None

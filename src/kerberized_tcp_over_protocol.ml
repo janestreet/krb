@@ -304,7 +304,7 @@ module Server = struct
         (module Protocol : Protocol_with_test_mode_intf.S
           with type protocol_backend = backend
            and type Connection.t = conn)
-        ~backend_peek_bin_prot
+        ~peek_protocol_version_header
         ~authorize
         krb_mode
     =
@@ -312,21 +312,26 @@ module Server = struct
     krb_server_protocol (module Protocol) ~authorize:authorize_mapped krb_mode
     >>=? fun krb_server_protocol ->
     let server_protocol ~peer backend =
-      Deferred.Or_error.try_with
-        ~run:
-          `Schedule
-        ~rest:`Log
-        (fun () -> backend_peek_bin_prot backend Protocol_version_header.any_magic_prefix)
-      >>| (function
-        | Error _ | Ok `Eof -> None
-        | Ok (`Ok x) -> x)
-      >>= function
-      | Some Protocol_version_header.Known_protocol.Krb | Some Krb_test_mode ->
-        krb_server_protocol ~peer backend >>|? fun conn -> `Krb conn
+      let%bind peek_result =
+        Deferred.Or_error.try_with (fun () -> peek_protocol_version_header backend)
+        >>| function
+        | Error _ | Ok `Eof -> `Ok None
+        | Ok `Not_enough_data -> `Not_enough_data
+        | Ok (`Ok x) -> `Ok x
+      in
+      match peek_result with
+      | `Not_enough_data ->
+        return
+          (Error
+             (`Handshake_error
+                (Error.of_string
+                   "Not enough data written by the client to determine if it's kerberized")))
+      | `Ok (Some Protocol_version_header.Known_protocol.Krb) | `Ok (Some Krb_test_mode)
+        -> krb_server_protocol ~peer backend >>|? fun conn -> `Krb conn
       (* [None] is assumed to be an async rpc client here so that async rpc clients
          rolled prior to the addition of the magic number (c. 02-2017) will be able to
          connect. *)
-      | Some Rpc | None ->
+      | `Ok (Some Rpc) | `Ok None ->
         let ok = Ok `Anon in
         (match Authorize.For_internal_use.Anon.authorize authorize peer None with
          | `Accept -> return ok

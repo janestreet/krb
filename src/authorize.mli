@@ -33,6 +33,15 @@ val accept_all : t
 val accept_single : Principal.Name.t -> t
 val accept_multiple : Principal.Name.Set.t -> t
 
+module Cross_realm : sig
+  val create
+    :  (Socket.Address.Inet.t -> Cross_realm_principal_name.t -> [ `Accept | `Reject ])
+    -> t
+
+  val accept_single : Cross_realm_principal_name.t -> t
+  val accept_multiple : Cross_realm_principal_name.Set.t -> t
+end
+
 module Anon : sig
   type t
 
@@ -50,11 +59,16 @@ module Anon : sig
   val accept_multiple : Principal.Name.Set.t -> t
 end
 
-val anon_of_krb : ?on_anon:[ `Accept | `Reject ] (** Default accept *) -> t -> Anon.t
 val krb_of_anon : Anon.t -> t
 
 module For_internal_use : sig
-  val authorize : t -> Socket.Address.Inet.t -> Principal.Name.t -> [ `Accept | `Reject ]
+  val authorize
+    :  t
+    -> Socket.Address.Inet.t
+    -> Cross_realm_principal_name.t
+    -> [ `Accept | `Reject ]
+
+  val allows_cross_realm : t -> bool
 
   module Anon : sig
     val authorize

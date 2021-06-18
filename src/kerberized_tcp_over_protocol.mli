@@ -99,10 +99,13 @@ module Server : sig
     -> (module Protocol_with_test_mode_intf.S
          with type protocol_backend = 'backend
           and type Connection.t = 'conn)
-    -> backend_peek_bin_prot:
+    -> peek_protocol_version_header:
          ('backend
-          -> Protocol_version_header.Known_protocol.t option Bin_prot.Type_class.reader
-          -> [ `Eof | `Ok of Protocol_version_header.Known_protocol.t option ] Deferred.t)
+          -> [< `Eof
+             | `Not_enough_data
+             | `Ok of Protocol_version_header.Known_protocol.t option
+             ]
+               Deferred.t)
     -> authorize:Authorize.Anon.t
     -> Mode.Server.t
     -> (peer:Socket.Address.Inet.t

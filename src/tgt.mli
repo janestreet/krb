@@ -58,3 +58,12 @@ val get_cached_tgt
     are already being renewed, even if [keep_valid_indefinitely] is called multiple times
     on the same cred cache with the same principal + keytab. *)
 val num_active_renewal_jobs : unit -> int
+
+module Cross_realm : sig
+  val ensure_valid
+    :  ?valid_for_at_least:Time.Span.t (** default: 10m *)
+    -> ?keytab:Keytab.Path.t
+    -> cred_cache:Cred_cache.t
+    -> Cross_realm_principal_name.t
+    -> unit Deferred.Or_error.t
+end

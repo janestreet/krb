@@ -9,8 +9,8 @@ module type Connection = sig
   val create_for_test_mode
     :  backend:protocol_backend
     -> conn_type:Conn_type.t
-    -> my_principal:Principal.Name.t
-    -> peer_principal:Principal.Name.t
+    -> my_principal:Cross_realm_principal_name.t
+    -> peer_principal:Cross_realm_principal_name.t
     -> t
 
   val backend : t -> protocol_backend
@@ -30,6 +30,11 @@ module type Connection = sig
     :  t
     -> Internal.Auth_context.Krb_cred.t
     -> Internal.Cred_cache.t Deferred.Or_error.t
+
+  module Cross_realm : sig
+    val my_principal : t -> Cross_realm_principal_name.t
+    val peer_principal : t -> Cross_realm_principal_name.t
+  end
 end
 
 type 'a with_serve_krb_args =

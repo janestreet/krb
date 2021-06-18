@@ -6,13 +6,7 @@ module Stable = struct
     module V1 = struct
       type t = Protocol_version_header.t [@@deriving bin_io, sexp]
 
-      let versions = [ 1; 2; 3; 4 ]
-
-      let value ?(override_supported_versions = versions) () =
-        Protocol_version_header.create_exn
-          ~protocol:Krb
-          ~supported_versions:override_supported_versions
-      ;;
+      let versions = [ 1; 2; 3; 4; 5 ]
     end
   end
 
@@ -35,6 +29,33 @@ module Stable = struct
 
     module Client_header = struct
       type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; ap_request : Bigstring.V1.t
+        ; forwarded_creds_ap_request : Bigstring.V1.t
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+  end
+
+  module V5 = struct
+    module Mode = struct
+      type t = V4.Mode.t =
+        | Service
+        | User_to_user of string
+      [@@deriving bin_io, sexp]
+    end
+
+    module Server_header = struct
+      type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; principal : Cross_realm_principal_name.Stable.V1.t
+        ; endpoint : Mode.t
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+
+    module Client_header = struct
+      type t = V4.Client_header.t =
         { accepted_conn_types : Conn_type_preference.V1.t
         ; ap_request : Bigstring.V1.t
         ; forwarded_creds_ap_request : Bigstring.V1.t
@@ -69,12 +90,19 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       ; conn_type : Conn_type.t
       ; forwarded_creds_auth_context : Auth_context.t option
       ; cred_cache : Internal.Cred_cache.t option
-      ; my_principal : Principal.Name.t
-      ; peer_principal : Principal.Name.t
+      ; my_principal : Cross_realm_principal_name.t
+      ; peer_principal : Cross_realm_principal_name.t
       ; protocol_version : [ `Test_mode | `Versioned of int ]
       }
     [@@deriving fields]
 
+    module Cross_realm = struct
+      let my_principal = my_principal
+      let peer_principal = peer_principal
+    end
+
+    let my_principal t = Cross_realm.my_principal t |> Principal.Name.of_cross_realm
+    let peer_principal t = Cross_realm.peer_principal t |> Principal.Name.of_cross_realm
     let create = Fields.create
 
     let create_for_test_mode =
@@ -112,7 +140,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
        ensure our ticket has more lifetime than that. *)
     let try_to_ensure_tgt_is_valid_for_long_enough ~principal ~cred_cache =
       match%bind
-        Tgt.ensure_valid
+        Tgt.Cross_realm.ensure_valid
           ~valid_for_at_least:(Time.Span.of_hr 1.)
           ~keytab:User
           ~cred_cache
@@ -130,7 +158,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     let make_krb_cred t ~forwardable =
       let open Deferred.Or_error.Let_syntax in
-      let%bind client = Principal.create t.my_principal in
+      let%bind client = Principal.Cross_realm.create t.my_principal in
       match Option.both t.forwarded_creds_auth_context t.cred_cache with
       | Some (auth_context, cred_cache) ->
         let%bind () =
@@ -142,20 +170,24 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Deferred.Or_error.error_s
           [%message
             "Unable to make krb_cred for forwarded credentials."
-              ~required_protocol_version:(`Versioned 4 : [ `Versioned of int ])
+              ~required_protocol_version:
+                ([ `Versioned 4; `Versioned 5 ] : [ `Versioned of int ] list)
               ~negotiated_protocol_version:
                 (t.protocol_version : [ `Test_mode | `Versioned of int ])]
     ;;
 
     let read_krb_cred t krb_cred =
       let open Deferred.Or_error.Let_syntax in
-      let%bind cred_cache = Cred_cache.in_memory_for_principal t.peer_principal in
+      let%bind cred_cache =
+        Cred_cache.Cross_realm.in_memory_for_principal t.peer_principal
+      in
       match t.forwarded_creds_auth_context with
       | None ->
         Deferred.Or_error.error_s
           [%message
             "Unable to read krb_cred for forwarded credentials"
-              ~required_protocol_version:(`Versioned 4 : [ `Versioned of int ])
+              ~required_protocol_version:
+                ([ `Versioned 4; `Versioned 5 ] : [ `Versioned of int ] list)
               ~negotiated_protocol_version:
                 (t.protocol_version : [ `Test_mode | `Versioned of int ])]
       | Some auth_context ->
@@ -350,13 +382,15 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         |> krb_error
         >>| handle_error ~backend "failed to initiate auth_context"
         >>=? fun (auth_context, client) ->
-        let client_principal_name = Principal.name client in
+        let client_principal_name = Principal.Cross_realm.name client in
+        let my_principal = Principal.Cross_realm.name principal in
         let authorize_result =
           Authorizer.run
             ~authorize
             ~acting_as:Server
+            ~my_principal
             ~peer_address:peer
-            client_principal_name
+            ~peer_principal:client_principal_name
         in
         write_field'
           ~conn_type
@@ -372,7 +406,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~conn_type
             ~auth_context:(`Prod auth_context)
             ~backend
-            ~my_principal:(Principal.name principal)
+            ~my_principal
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned 1)
         in
@@ -437,12 +471,15 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         let server_principal_s = Header.Server.principal server_header in
         Internal.Principal.of_string server_principal_s
         >>=? fun server_principal ->
-        let server_principal_name = Principal.name server_principal in
+        Cred_cache.Cross_realm.principal cred_cache
+        >>=? fun my_principal ->
+        let server_principal_name = Principal.Cross_realm.name server_principal in
         Authorizer.run
           ~authorize
           ~acting_as:Client
+          ~my_principal
           ~peer_address:peer
-          server_principal_name
+          ~peer_principal:server_principal_name
         |> return
         >>=? fun () ->
         setup_client_context ~cred_cache ~backend server_header
@@ -462,9 +499,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~name:"Server ack"
           (Or_error.Stable.V2.bin_reader_t Unit.bin_reader_t)
         >>| Or_error.join
-        >>=? fun () ->
-        Cred_cache.principal cred_cache
-        >>|? fun my_principal ->
+        >>|? fun () ->
         Connection.create_no_forwarded_creds
           ~conn_type
           ~auth_context:(`Prod auth_context)
@@ -577,13 +612,15 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         |> krb_error
         >>=? fun ap_rep ->
         Header.Ap_rep.write ~backend ap_rep;
-        let client_principal_name = Principal.name client in
+        let my_principal = Principal.Cross_realm.name principal in
+        let client_principal_name = Principal.Cross_realm.name client in
         let authorize_result =
           Authorizer.run
             ~authorize
             ~acting_as:Server
+            ~my_principal
             ~peer_address:peer
-            client_principal_name
+            ~peer_principal:client_principal_name
         in
         (* These acks are probably not necessary at this point, but it is a good sanity
            check that both the client and server can encrypt/decrypt with the correct
@@ -602,7 +639,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~conn_type
             ~auth_context:(`Prod auth_context)
             ~backend
-            ~my_principal:(Principal.name principal)
+            ~my_principal
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned 2)
         in
@@ -670,14 +707,19 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun ap_rep ->
         Auth_context.Client.read_and_verify_ap_rep auth_context ~ap_rep
         >>=? fun () ->
+        Header.Server.principal server_header
+        |> Principal.Name.with_default_realm
+        >>=? fun server_principal_name ->
+        Cred_cache.Cross_realm.principal cred_cache
+        >>=? fun my_principal ->
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
-        let server_principal_name = Header.Server.principal server_header in
         Authorizer.run
           ~authorize
           ~acting_as:Client
+          ~my_principal
           ~peer_address:peer
-          server_principal_name
+          ~peer_principal:server_principal_name
         |> return
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
@@ -689,9 +731,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~name:"Server ack"
           (Or_error.Stable.V2.bin_reader_t Unit.bin_reader_t)
         >>| Or_error.join
-        >>=? fun () ->
-        Cred_cache.principal cred_cache
-        >>|? fun my_principal ->
+        >>|? fun () ->
         Connection.create_no_forwarded_creds
           ~conn_type
           ~auth_context:(`Prod auth_context)
@@ -821,13 +861,15 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         |> krb_error
         >>=? fun ap_rep ->
         Header.Ap_rep.write ~backend ap_rep;
-        let client_principal_name = Principal.name client in
+        let client_principal_name = Principal.Cross_realm.name client in
+        let my_principal = Principal.Cross_realm.name principal in
         let authorize_result =
           Authorizer.run
             ~authorize
             ~acting_as:Server
             ~peer_address:peer
-            client_principal_name
+            ~peer_principal:client_principal_name
+            ~my_principal
         in
         (* These acks are probably not necessary at this point, but it is a good sanity
            check that both the client and server can encrypt/decrypt with the correct
@@ -848,7 +890,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
               read_bin_prot' ~backend ~name:"KRB-CRED" Auth_context.Krb_cred.bin_reader_t
             in
             let%bind cred_cache =
-              Cred_cache.in_memory_for_principal client_principal_name |> krb_error
+              Cred_cache.Cross_realm.in_memory_for_principal client_principal_name
+              |> krb_error
             in
             let%map () =
               Auth_context.Service.read_krb_cred_into_cred_cache
@@ -875,7 +918,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~conn_type
             ~auth_context:(`Prod auth_context)
             ~backend
-            ~my_principal:(Principal.name principal)
+            ~my_principal
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned this_version)
         in
@@ -967,14 +1010,19 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun ap_rep ->
         Auth_context.Client.read_and_verify_ap_rep auth_context ~ap_rep
         >>=? fun () ->
+        Header.Server.principal server_header
+        |> Principal.Name.with_default_realm
+        >>=? fun server_principal_name ->
+        Cred_cache.Cross_realm.principal cred_cache
+        >>=? fun my_principal ->
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
-        let server_principal_name = Header.Server.principal server_header in
         Authorizer.run
           ~authorize
           ~acting_as:Client
+          ~my_principal
           ~peer_address:peer
-          server_principal_name
+          ~peer_principal:server_principal_name
         |> return
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
@@ -1003,9 +1051,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             Backend.write_bin_prot_exn backend Auth_context.Krb_cred.bin_writer_t krb_cred;
             return ())
           else return ())
-        >>=? fun () ->
-        Cred_cache.principal cred_cache
-        >>|? fun my_principal ->
+        >>|? fun () ->
         Connection.create_no_forwarded_creds
           ~conn_type
           ~auth_context:(`Prod auth_context)
@@ -1151,13 +1197,15 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         |> krb_error
         >>=? fun ap_rep ->
         Header.Ap_rep.write ~backend ap_rep;
-        let client_principal_name = Principal.name client in
+        let my_principal = Principal.Cross_realm.name principal in
+        let client_principal_name = Principal.Cross_realm.name client in
         let authorize_result =
           Authorizer.run
             ~authorize
             ~acting_as:Server
+            ~my_principal
             ~peer_address:peer
-            client_principal_name
+            ~peer_principal:client_principal_name
         in
         (* These acks are probably not necessary at this point, but it is a good sanity
            check that both the client and server can encrypt/decrypt with the correct
@@ -1177,7 +1225,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             ~auth_context:(`Prod auth_context)
             ~forwarded_creds_auth_context:(Some forwarded_creds_auth_context)
             ~backend
-            ~my_principal:(Principal.name principal)
+            ~my_principal
             ~peer_principal:client_principal_name
             ~protocol_version:(`Versioned this_version)
         in
@@ -1267,14 +1315,20 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun ap_rep ->
         Auth_context.Client.read_and_verify_ap_rep auth_context ~ap_rep
         >>=? fun () ->
+        Header.Server.principal server_header
+        |> Principal.Name.with_default_realm
+        >>=? fun server_principal_name ->
+        let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
+        Cred_cache.Cross_realm.principal cred_cache
+        >>=? fun my_principal ->
         (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
            trust the principal if the connection type is [Auth]. *)
-        let server_principal_name = Header.Server.principal server_header in
         Authorizer.run
           ~authorize
           ~acting_as:Client
+          ~my_principal
           ~peer_address:peer
-          server_principal_name
+          ~peer_principal:server_principal_name
         |> return
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
@@ -1286,10 +1340,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~name:"Server ack"
           (Or_error.Stable.V2.bin_reader_t Unit.bin_reader_t)
         >>| Or_error.join
-        >>=? fun () ->
-        let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
-        Cred_cache.principal cred_cache
-        >>|? fun my_principal ->
+        >>|? fun () ->
         Connection.create_client
           ~conn_type
           ~auth_context:(`Prod auth_context)
@@ -1303,24 +1354,364 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     end
   end
 
-  let negotiate backend ~our_version =
-    Backend.write_bin_prot_exn backend Header.V1.bin_writer_t our_version;
-    read_bin_prot ~backend ~name:"Version header" Header.V1.bin_reader_t
-    >>=? fun other_versions ->
-    Protocol_version_header.negotiate
-      ~allow_legacy_peer:true
-      ~us:our_version
-      ~peer:other_versions
-    |> Or_error.map ~f:(fun version ->
-      Debug.log_s (fun () ->
-        [%message "Negotiated Kerberos version" ~v:(version : int)]);
-      `Versioned version)
-    |> return
-  ;;
+  (* Equivalent to V4 but server header uses a [Cross_realm_principal_name] rather than a
+     [Principal.Name.t]. This is needed for cross-realm support *)
+  module V5 = struct
+    (* Protocol overview:
+       - Server writes [Header.Server.t]
+       - Client reads [Header.Server.t], obtains 2 tickets from KDC (one for each auth context),
+         sends [Header.Client.t]
+       - Server reads [Header.Client.t], checks tickets (establishing authenticity of client)
+       - Server writes [Header.Ap_rep.t]
+       - Client reads and verifies [Header.Ap_rep.t] (establishing authenticity of server)
+       - The connection is now authenticated
+       - Both pick the maximum conn_type they both support
+       - Both write an ACK (Server: unit Or_error.t, Client: unit) encrypted as per the
+         agreed upon conn_type
+       - Both read the ACK.
+       - If this all succeeds, the connection is established
+    *)
+    module Mode = struct
+      type t = Stable.V5.Mode.t =
+        | Service
+        | User_to_user of string
+      [@@deriving bin_io, sexp]
+
+      let is_user_to_user = function
+        | Service -> false
+        | User_to_user _ -> true
+      ;;
+    end
+
+    let this_version = 5
+
+    module Header = struct
+      module Server = struct
+        type t = Stable.V5.Server_header.t =
+          { accepted_conn_types : Conn_type_preference.V1.t
+          ; principal : Cross_realm_principal_name.Stable.V1.t
+          ; endpoint : Mode.t
+          }
+        [@@deriving bin_io, fields, sexp]
+
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
+        let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
+      end
+
+      module Client = struct
+        type t = Stable.V5.Client_header.t =
+          { accepted_conn_types : Conn_type_preference.V1.t
+          ; ap_request : Bigstring.Stable.V1.t
+          ; forwarded_creds_ap_request : Bigstring.Stable.V1.t
+          }
+        [@@deriving bin_io, fields, sexp]
+
+        let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
+        let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
+      end
+
+      module Ap_rep = struct
+        let write ~backend t =
+          Backend.write_bin_prot_exn backend Auth_context.Ap_rep.bin_writer_t t
+        ;;
+
+        let read ~backend =
+          read_bin_prot ~backend ~name:"Ap_rep" Auth_context.Ap_rep.bin_reader_t
+        ;;
+      end
+    end
+
+    module Server = struct
+      let do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
+        (match endpoint with
+         | `Service keytab -> return (Ok (Mode.Service, `Keytab keytab))
+         | `User_to_user_via_tgt tgt ->
+           let endpoint = Mode.User_to_user (Credentials.ticket_string tgt) in
+           Credentials.keyblock tgt
+           |> krb_error
+           >>|? fun keyblock -> endpoint, `User_to_user keyblock)
+        >>=? fun (endpoint, authentication_key) ->
+        let header =
+          Header.Server.Fields.create
+            ~accepted_conn_types
+            ~principal:(Principal.Cross_realm.name principal)
+            ~endpoint
+        in
+        Header.Server.write ~backend header;
+        Header.Client.read' ~backend
+        >>=? fun client_header ->
+        Unstable.Conn_type_preference.negotiate
+          ~us:accepted_conn_types
+          ~peer:(Header.Client.accepted_conn_types client_header)
+        |> return
+        |> handshake_error
+        >>=? fun conn_type ->
+        debug_log_connection_setup
+          ~peer
+          ~conn_type
+          ~user_to_user:(Mode.is_user_to_user endpoint)
+          ~acting_as:`Server;
+        (let init_auth_context ap_req =
+           Auth_context.Service.init
+             principal
+             authentication_key
+             ~ap_req
+             ~local_inet:(Backend.local_inet backend)
+             ~remote_inet:(Backend.remote_inet backend)
+         in
+         init_auth_context (Header.Client.ap_request client_header)
+         >>=? fun auth_context ->
+         init_auth_context (Header.Client.forwarded_creds_ap_request client_header)
+         >>|? fun forwarded_creds_auth_context ->
+         auth_context, forwarded_creds_auth_context)
+        |> krb_error
+        >>=? fun ( (auth_context, client)
+                 , (forwarded_creds_auth_context, forwarded_creds_client) ) ->
+        (let client_s = Principal.to_string client in
+         let forwarded_creds_client_s = Principal.to_string forwarded_creds_client in
+         if String.equal client_s forwarded_creds_client_s
+         then return (Ok ())
+         else (
+           let error =
+             Error.create_s
+               [%message
+                 "Client principals in AP_REQs don't match"
+                   ~client:(client_s : string)
+                   ~forwarded_creds_client:(forwarded_creds_client_s : string)]
+           in
+           return (Error (`Krb_error error))))
+        >>=? fun () ->
+        Auth_context.Service.make_ap_rep auth_context
+        |> krb_error
+        >>=? fun ap_rep ->
+        Header.Ap_rep.write ~backend ap_rep;
+        let my_principal = Principal.Cross_realm.name principal in
+        let client_principal_name = Principal.Cross_realm.name client in
+        let authorize_result =
+          Authorizer.run
+            ~authorize
+            ~acting_as:Server
+            ~my_principal
+            ~peer_address:peer
+            ~peer_principal:client_principal_name
+        in
+        (* These acks are probably not necessary at this point, but it is a good sanity
+           check that both the client and server can encrypt/decrypt with the correct
+           connection type. *)
+        write_field'
+          ~conn_type
+          ~auth_context
+          ~backend
+          (Or_error.Stable.V2.bin_writer_t Unit.bin_writer_t)
+          authorize_result
+        >>=? fun () ->
+        read_field' ~conn_type ~auth_context ~backend ~name:"Client ack" Unit.bin_reader_t
+        >>|? fun () ->
+        let conn =
+          Connection.create_server
+            ~conn_type
+            ~auth_context:(`Prod auth_context)
+            ~forwarded_creds_auth_context:(Some forwarded_creds_auth_context)
+            ~backend
+            ~my_principal
+            ~peer_principal:client_principal_name
+            ~protocol_version:(`Versioned this_version)
+        in
+        conn, authorize_result
+      ;;
+
+      let setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend =
+        do_setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
+        >>| function
+        | Error _ as error -> error
+        | Ok ((_ : Connection.t), Error (_ : Error.t)) -> Error `Rejected_client
+        | Ok (conn, Ok ()) -> Ok conn
+      ;;
+    end
+
+    module Client = struct
+      let setup_client_context ~client_cred_cache ~backend server_header =
+        let second_ticket, cred_cache_flags, client_context_flags =
+          match Header.Server.endpoint server_header with
+          | Service -> None, [], [ Flags.Ap_req.AP_OPTS_MUTUAL_REQUIRED ]
+          | User_to_user tgt ->
+            ( Some tgt
+            , [ Flags.Get_credentials.KRB5_GC_USER_USER ]
+            , [ AP_OPTS_USE_SESSION_KEY; AP_OPTS_MUTUAL_REQUIRED ] )
+        in
+        let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
+        Internal.Cred_cache.principal cred_cache
+        >>=? fun client ->
+        Header.Server.principal server_header
+        |> Principal.Cross_realm.create
+        >>=? fun server ->
+        Credentials.create ?second_ticket ~client ~server ()
+        >>=? fun credentials_request ->
+        Client_cred_cache.get_credentials
+          ~flags:cred_cache_flags
+          client_cred_cache
+          ~request:credentials_request
+        >>=? fun (credentials, `Error_getting_creds_from_default_cache maybe_error) ->
+        (match maybe_error with
+         | None -> ()
+         | Some error ->
+           Log.Global.sexp
+             ~level:`Info
+             [%message
+               "Failed to get credentials from default cache (succeeded with memory cache)"
+                 (error : Error.t)
+                 (client_cred_cache : Client_cred_cache.t)]);
+        let init_auth_context () =
+          Auth_context.Client.init
+            client_context_flags
+            credentials
+            ~local_inet:(Backend.local_inet backend)
+            ~remote_inet:(Backend.remote_inet backend)
+        in
+        init_auth_context ()
+        >>=? fun (auth_context, ap_req) ->
+        init_auth_context ()
+        >>|? fun (forwarded_creds_auth_context, forwarded_creds_ap_req) ->
+        auth_context, ap_req, forwarded_creds_auth_context, forwarded_creds_ap_req
+      ;;
+
+      let setup ~client_cred_cache ~accepted_conn_types ~authorize ~peer backend =
+        Header.Server.read ~backend
+        >>=? fun server_header ->
+        Unstable.Conn_type_preference.negotiate
+          ~us:accepted_conn_types
+          ~peer:(Header.Server.accepted_conn_types server_header)
+        |> return
+        >>=? fun conn_type ->
+        debug_log_connection_setup
+          ~peer
+          ~conn_type
+          ~user_to_user:(Mode.is_user_to_user server_header.endpoint)
+          ~acting_as:`Client;
+        setup_client_context ~client_cred_cache ~backend server_header
+        >>=? fun ( auth_context
+                 , ap_request
+                 , forwarded_creds_auth_context
+                 , forwarded_creds_ap_request ) ->
+        let client_header =
+          Header.Client.Fields.create
+            ~accepted_conn_types
+            ~ap_request
+            ~forwarded_creds_ap_request
+        in
+        Header.Client.write ~backend client_header;
+        Header.Ap_rep.read ~backend
+        >>=? fun ap_rep ->
+        Auth_context.Client.read_and_verify_ap_rep auth_context ~ap_rep
+        >>=? fun () ->
+        let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
+        Cred_cache.Cross_realm.principal cred_cache
+        >>=? fun my_principal ->
+        let server_principal_name = Header.Server.principal server_header in
+        (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
+           trust the principal if the connection type is [Auth]. *)
+        Authorizer.run
+          ~authorize
+          ~acting_as:Client
+          ~my_principal
+          ~peer_address:peer
+          ~peer_principal:server_principal_name
+        |> return
+        >>=? fun () ->
+        write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
+        >>=? fun () ->
+        read_field
+          ~conn_type
+          ~auth_context
+          ~backend
+          ~name:"Server ack"
+          (Or_error.Stable.V2.bin_reader_t Unit.bin_reader_t)
+        >>| Or_error.join
+        >>|? fun () ->
+        Connection.create_client
+          ~conn_type
+          ~auth_context:(`Prod auth_context)
+          ~forwarded_creds_auth_context:(Some forwarded_creds_auth_context)
+          ~backend
+          ~cred_cache:(Some cred_cache)
+          ~my_principal
+          ~peer_principal:server_principal_name
+          ~protocol_version:(`Versioned this_version)
+      ;;
+    end
+  end
+
+  module Negotiate = struct
+    let cross_realm_min_version = V5.this_version
+
+    (*
+       Protocol versions before V5 do not pass the realm along with the
+       principal. To deal with this issue, we force all parties that
+       are not in [Config.pre_v5_assumed_realm] to use V5 and above. As
+       a result, all cross-realm communication will be over V5 at a minimum
+       and hence pass along the realm on the wire.
+    *)
+
+    let should_force_cross_realm_min_version principal =
+      let my_realm = Internal.Principal.realm principal in
+      not (String.equal my_realm Config.pre_v5_assumed_realm)
+    ;;
+
+    let negotiate ?(override_supported_versions = Header.V1.versions) ~backend principal =
+      let force_cross_realm_min_version =
+        should_force_cross_realm_min_version principal
+      in
+      let advertised_versions =
+        let supported_versions =
+          if force_cross_realm_min_version
+          then
+            List.filter
+              ~f:(fun version -> cross_realm_min_version <= version)
+              override_supported_versions
+          else override_supported_versions
+        in
+        Protocol_version_header.create_exn ~protocol:Krb ~supported_versions
+      in
+      Backend.write_bin_prot_exn backend Header.V1.bin_writer_t advertised_versions;
+      read_bin_prot ~backend ~name:"Version header" Header.V1.bin_reader_t
+      >>=? fun other_versions ->
+      Protocol_version_header.negotiate
+        ~allow_legacy_peer:true
+        ~us:advertised_versions
+        ~peer:other_versions
+      |> Result.map_error ~f:(fun error ->
+        if force_cross_realm_min_version
+        then (
+          (* Check whether negotiation would have succeeded without forcing V5+ *)
+          match
+            Protocol_version_header.negotiate
+              ~allow_legacy_peer:true
+              ~us:
+                (Protocol_version_header.create_exn
+                   ~protocol:Krb
+                   ~supported_versions:override_supported_versions)
+              ~peer:other_versions
+          with
+          | Ok _ ->
+            Error.create_s
+              [%message
+                "Failed to negotate Kerberos version. The process is not running in \
+                 the \"pre-v5 realm\" (Config.pre_v5_assumed_realm), and hence a \
+                 minimum version of 5 is forced."
+                  (error : Error.t)]
+          | Error _ -> error)
+        else error)
+      |> Or_error.map ~f:(fun version ->
+        Debug.log_s (fun () ->
+          [%message "Negotiated Kerberos version" ~v:(version : int)]);
+        `Versioned version)
+      |> return
+    ;;
+  end
 
   module Server = struct
     let handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend =
-      negotiate backend ~our_version:(Header.V1.value ())
+      Negotiate.negotiate ~backend principal
       |> handshake_error
       >>=? function
       | `Versioned 1 ->
@@ -1338,6 +1729,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           backend
       | `Versioned 4 ->
         V4.Server.setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
+      | `Versioned 5 ->
+        V5.Server.setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
       | `Versioned version ->
         let e =
           Error.create_s
@@ -1363,11 +1756,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   end
 
   module Client = struct
-    let negotiate ?override_supported_versions backend =
-      let our_version = Header.V1.value ?override_supported_versions () in
-      negotiate backend ~our_version
-    ;;
-
     let handshake_exn
           ?override_supported_versions
           ~authorize
@@ -1377,7 +1765,9 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           backend
       =
       let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
-      negotiate ?override_supported_versions backend
+      Internal.Cred_cache.principal cred_cache
+      >>=? fun my_principal ->
+      Negotiate.negotiate ?override_supported_versions ~backend my_principal
       >>=? function
       | `Versioned 1 ->
         V1.Client.setup ~cred_cache ~accepted_conn_types ~authorize ~peer backend
@@ -1393,6 +1783,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           backend
       | `Versioned 4 ->
         V4.Client.setup ~client_cred_cache ~accepted_conn_types ~authorize ~peer backend
+      | `Versioned 5 ->
+        V5.Client.setup ~client_cred_cache ~accepted_conn_types ~authorize ~peer backend
       | `Versioned version ->
         Deferred.Or_error.error_s
           [%message

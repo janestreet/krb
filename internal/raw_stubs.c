@@ -255,6 +255,30 @@ caml_krb5_free_cred_contents(value v_context_token, value v_creds)
 }
 
 CAMLprim value
+caml_krb5_default_realm(value v_context_token)
+{
+  CAMLparam1(v_context_token);
+  CAMLlocal1(o_realm_out);
+
+  krb5_context context = the_context(v_context_token);
+  char* realm_out = NULL;
+  krb5_error_code retval;
+
+  caml_release_runtime_system();
+  retval = krb5_get_default_realm(context, &realm_out);
+  caml_acquire_runtime_system();
+
+  if (retval)
+    CAMLreturn(wrap_result(Val_unit, retval));
+  else
+  {
+    o_realm_out = caml_copy_string(realm_out);
+    krb5_free_default_realm(context, realm_out);
+    CAMLreturn(wrap_result(o_realm_out, retval));
+  }
+}
+
+CAMLprim value
 caml_krb5_parse_name(value v_context_token, value v_name)
 {
   CAMLparam2(v_context_token, v_name);

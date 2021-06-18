@@ -22,7 +22,13 @@ type t = Internal.Principal.t
 
 module Name : sig
   (** A [Name.t] represents the conventional names that may appear in a Kerberos
-      principal (i.e. the bit before "@REALM"). *)
+      principal (i.e. the bit before "@REALM").
+
+      By default, when constructing a principal from this type, we assume that the
+      principal is within the default realm configured in [krb.conf]. If realm
+      information should be preserved (eg. within cross-realm environments), use
+      [Cross_realm_principal_name.t] instead.
+  *)
   type t =
     | User of string
     | Service of
@@ -35,14 +41,11 @@ module Name : sig
   (** [to_string] returns either <username> or <service>/<hostname>.
 
       [of_string] is lenient to inclusion of the realm (for all principals) and full
-      qualification of the domain name (for service principals). *)
+      qualification of the domain name (for service principals). We drop the provided
+      realm and drop a provided domain name if it matches the default domain. *)
+
   include Stringable.S with type t := t
-
-  include Comparator.S with type t := t
-
-  include
-    Comparable.S_plain with type t := t with type comparator_witness := comparator_witness
-
+  include Comparable.S_plain with type t := t
   include Hashable.S_plain with type t := t
 
   (** accepts <username> or <service>/<hostname> *)
@@ -55,10 +58,21 @@ module Name : sig
   val to_username_exn : t -> Username.t
 
   val service_on_this_host : service:string -> t
+
+  (** Cross-realm *)
+
+  val of_cross_realm : Cross_realm_principal_name.t -> t
+  val with_realm : realm:Realm.t -> t -> Cross_realm_principal_name.t
+  val with_default_realm : t -> Cross_realm_principal_name.t Deferred.Or_error.t
 end
 
 val create : Name.t -> t Deferred.Or_error.t
 val name : t -> Name.t
+
+module Cross_realm : sig
+  val create : Cross_realm_principal_name.t -> t Deferred.Or_error.t
+  val name : t -> Cross_realm_principal_name.t
+end
 
 
 val to_string : t -> string
@@ -70,19 +84,10 @@ val kvno : ?cred_cache:Internal.Cred_cache.t -> t -> int Deferred.Or_error.t
 
 module Stable : sig
   module Name : sig
-    module V1 : sig
-      type nonrec t = Name.t =
-        | User of string
-        | Service of
-            { service : string
-            ; hostname : string
-            }
-
-      include
-        Stable_comparable.V1
-        with type t := t
-        with type comparator_witness = Name.comparator_witness
-    end
+    module V1 :
+      Stable_comparable.V1
+      with type t = Name.t
+      with type comparator_witness = Name.comparator_witness
   end
 end
 

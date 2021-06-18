@@ -3,24 +3,25 @@ module Stable = struct
 
   module Name = struct
     module V1 = struct
-      module T2 = struct
-        module T1 = struct
-          type t =
-            | User of string
-            | Service of
-                { service : string
-                ; hostname : string
-                }
-          [@@deriving bin_io, compare, hash, sexp]
-        end
+      module T = struct
+        type t =
+          | User of string
+          | Service of
+              { service : string
+              ; hostname : string
+              }
+        [@@deriving bin_io, compare, hash, sexp]
 
-        module C = Comparator.V1.Make (T1)
-        include T1
-        include C
+        let%expect_test _ =
+          print_endline [%bin_digest: t];
+          [%expect {| b49cc489842e6ad3217157385a6f94d7 |}]
+        ;;
+
+        include (val Comparator.V1.make ~compare ~sexp_of_t)
       end
 
-      include T2
-      include Comparable.V1.Make (T2)
+      include T
+      include Comparable.V1.Make (T)
     end
   end
 end
@@ -43,14 +44,22 @@ module Name = struct
 
     let comparator = Stable.Name.V1.comparator
 
-    let hostname_suffix =
-      Option.value_map Config.domain_name ~f:(fun x -> "." ^ x) ~default:""
+    let append_default_domain hostname =
+      let hostname_suffix =
+        Option.value_map Config.default_domain ~f:(fun x -> "." ^ x) ~default:""
+      in
+      (* "localhost" is not a hostname that will show up in an SPN, but we use it in some
+         tests. *)
+      if Config.am_sandboxed && String.equal hostname "localhost"
+      then "localhost"
+      else hostname ^ hostname_suffix
     ;;
 
     let to_principal = function
       | User s -> Internal.Principal.of_string s
       | Service { service; hostname } ->
-        Internal.Principal.of_string (sprintf "%s/%s%s" service hostname hostname_suffix)
+        let hostname = append_default_domain hostname in
+        Internal.Principal.of_string (sprintf "%s/%s" service hostname)
     ;;
 
     let to_string = function
@@ -59,18 +68,11 @@ module Name = struct
     ;;
 
     let of_string x =
-      let without_realm =
-        Option.value ~default:x (String.chop_suffix x ~suffix:("@" ^ Config.realm))
-      in
-      match String.rsplit2 ~on:'/' without_realm with
-      | None -> User without_realm
-      | Some (service, hostname) ->
-        let hostname =
-          Option.value
-            ~default:hostname
-            (String.chop_suffix hostname ~suffix:hostname_suffix)
-        in
-        Service { service; hostname }
+      match Principal_parser.parse x with
+      | { primary; instance = None; _ } -> User primary
+      | { primary; instance = Some instance; _ } ->
+        let hostname = Principal_parser.chop_default_domain instance in
+        Service { service = primary; hostname }
     ;;
 
     let of_principal principal = of_string (Internal.Principal.to_string principal)
@@ -93,6 +95,26 @@ module Name = struct
     let service_on_this_host ~service =
       Service { service; hostname = Core_unix.gethostname () }
     ;;
+
+    let of_cross_realm = function
+      | Cross_realm_principal_name.User { username; _ } -> User username
+      | Service { service; hostname; _ } ->
+        let hostname = Principal_parser.chop_default_domain hostname in
+        Service { service; hostname }
+    ;;
+
+    let with_realm ~realm principal =
+      match principal with
+      | User user -> Cross_realm_principal_name.User { username = user; realm }
+      | Service { service; hostname } ->
+        let hostname = append_default_domain hostname in
+        Service { service; hostname; realm }
+    ;;
+
+    let with_default_realm principal =
+      let%map.Deferred.Or_error realm = Realm.default () in
+      with_realm ~realm principal
+    ;;
   end
 
   include T
@@ -105,6 +127,18 @@ include Internal.Principal
 let name = Name.of_principal
 let create = Name.to_principal
 let check_password = Internal.Credentials.check_password
+
+module Cross_realm = struct
+  let create name =
+    Internal.Principal.of_string (Cross_realm_principal_name.to_string name)
+  ;;
+
+  let name principal =
+    (* This [_exn] is safe because the underlying kerberos library uses the default realm
+       if none is supplied (see [krb5_parse_name] docs *)
+    Cross_realm_principal_name.of_string_exn (Internal.Principal.to_string principal)
+  ;;
+end
 
 let kvno ?cred_cache server =
   let open Deferred.Or_error.Let_syntax in
@@ -119,16 +153,4 @@ let kvno ?cred_cache server =
   let%bind credential = Internal.Cred_cache.get_credentials ~flags ~request cred_cache in
   let%map ticket = Internal.Credentials.ticket credential in
   Internal.Ticket.kvno ticket
-;;
-
-let%test_unit "roundtrip [Name.t]" =
-  let test name =
-    Thread_safe.block_on_async_exn (fun () ->
-      Name.to_principal name
-      >>|? fun principal ->
-      [%test_result: Name.t] (Name.of_principal principal) ~expect:name)
-    |> ok_exn
-  in
-  test (User "test_user");
-  test (Service { service = "test"; hostname = "host" })
 ;;

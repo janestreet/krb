@@ -244,7 +244,10 @@ module Server = struct
       Kerberized_tcp_over_protocol.Server.krb_or_anon_server_protocol
         (module Protocol_backend_async)
         (module Async_protocol)
-        ~backend_peek_bin_prot:Protocol_backend_async.peek_bin_prot
+        ~peek_protocol_version_header:(fun backend ->
+          Protocol_backend_async.peek_bin_prot
+            backend
+            Protocol_version_header.any_magic_prefix)
         ~authorize
         krb_mode
       >>=? fun server_protocol ->

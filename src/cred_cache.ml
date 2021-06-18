@@ -17,26 +17,37 @@ let default_principal () =
   principal cred_cache
 ;;
 
-let in_memory_cred_caches = lazy (Principal.Name.Table.create ())
+let in_memory_cred_caches = lazy (Cross_realm_principal_name.Table.create ())
+
+module Cross_realm = struct
+  let principal t =
+    let%map principal = Internal.Cred_cache.principal t in
+    Principal.Cross_realm.name principal
+  ;;
+
+  let in_memory_for_principal principal_name =
+    let in_memory_cred_caches = Lazy.force in_memory_cred_caches in
+    match Hashtbl.find in_memory_cred_caches principal_name with
+    | Some (`Ok cred_cache) -> Deferred.Or_error.return cred_cache
+    | Some (`Wait ivar) -> Ivar.read ivar
+    | None ->
+      let ivar = Ivar.create () in
+      Hashtbl.add_exn in_memory_cred_caches ~key:principal_name ~data:(`Wait ivar);
+      let%bind.Deferred result =
+        let%bind principal = Principal.Cross_realm.create principal_name in
+        Internal.Cred_cache.create MEMORY principal
+      in
+      Ivar.fill ivar result;
+      (match result with
+       | Ok cred_cache ->
+         Hashtbl.set in_memory_cred_caches ~key:principal_name ~data:(`Ok cred_cache)
+       | Error _ -> Hashtbl.remove in_memory_cred_caches principal_name);
+      Deferred.return result
+  ;;
+end
 
 let in_memory_for_principal principal_name =
-  let in_memory_cred_caches = Lazy.force in_memory_cred_caches in
-  match Hashtbl.find in_memory_cred_caches principal_name with
-  | Some (`Ok cred_cache) -> Deferred.Or_error.return cred_cache
-  | Some (`Wait ivar) -> Ivar.read ivar
-  | None ->
-    let ivar = Ivar.create () in
-    Hashtbl.add_exn in_memory_cred_caches ~key:principal_name ~data:(`Wait ivar);
-    let%bind.Deferred result =
-      let%bind principal = Principal.create principal_name in
-      Internal.Cred_cache.create MEMORY principal
-    in
-    Ivar.fill ivar result;
-    (match result with
-     | Ok cred_cache ->
-       Hashtbl.set in_memory_cred_caches ~key:principal_name ~data:(`Ok cred_cache)
-     | Error _ -> Hashtbl.remove in_memory_cred_caches principal_name);
-    Deferred.return result
+  Principal.Name.with_default_realm principal_name >>= Cross_realm.in_memory_for_principal
 ;;
 
 let mktemp template =

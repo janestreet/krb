@@ -10,6 +10,7 @@ val of_string : string -> t Deferred.Or_error.t
 val to_string : t -> string
 val realm : t -> string
 val salt : t -> Data.t Deferred.Or_error.t
+val default_realm : unit -> string Deferred.Or_error.t
 
 module Raw : sig
   type t

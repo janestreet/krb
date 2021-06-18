@@ -74,6 +74,7 @@ let handle_client
       ~connection_state:(fun rpc_conn ->
         let client_identity =
           { Client_identity.client_principal
+          ; cross_realm_client_principal = Connection.Cross_realm.peer_principal conn
           ; request_forwarded_creds = request_forwarded_creds rpc_conn
           }
         in

@@ -10,6 +10,7 @@ module Raw = struct
   external salt : Context.t -> t -> Data.t Krb_result.t = "caml_krb5_principal2salt"
   external realm : t -> string = "caml_krb5_princ_realm"
   external is_config_principal : Context.t -> t -> bool = "caml_krb5_is_config_principal"
+  external default_realm : Context.t -> string Krb_result.t = "caml_krb5_default_realm"
 end
 
 type t =
@@ -51,4 +52,9 @@ let salt t =
   >>|? fun salt ->
   Context_sequencer.add_finalizer salt ~f:Data.free;
   salt
+;;
+
+let default_realm () =
+  let info = Krb_info.create "[krb5_default_realm]" in
+  Context_sequencer.enqueue_job_with_info ~info ~f:(fun c -> Raw.default_realm c)
 ;;

@@ -44,3 +44,8 @@ val initialize_with_creds
 (** Initializes the shared MEMORY cache associated with the principal of [t]
     (see [in_memory_for_principal]) with the credentials from [t]. *)
 val initialize_in_memory_with_creds_from : t -> t Deferred.Or_error.t
+
+module Cross_realm : sig
+  val principal : t -> Cross_realm_principal_name.t Deferred.Or_error.t
+  val in_memory_for_principal : Cross_realm_principal_name.t -> t Deferred.Or_error.t
+end

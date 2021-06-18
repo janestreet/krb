@@ -310,7 +310,7 @@ let of_connection
       max_message_size
       ();
   match Async_protocol.Connection.protocol_version connection with
-  | `Test_mode | `Versioned 2 | `Versioned 3 | `Versioned 4 ->
+  | `Test_mode | `Versioned 2 | `Versioned 3 | `Versioned 4 | `Versioned 5 ->
     let transport =
       match Async_protocol.Connection.auth_context connection with
       | `Test_mode ->

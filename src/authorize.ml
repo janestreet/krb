@@ -4,7 +4,6 @@ open! Import
 
 
 type 'principal authorize = Socket.Address.Inet.t -> 'principal -> [ `Accept | `Reject ]
-type t = Principal.Name.t authorize
 
 let bool_to_auth = function
   | true -> `Accept
@@ -12,40 +11,78 @@ let bool_to_auth = function
 ;;
 
 module Krb = struct
-  let create f = f
-  let accept_all _ _ = `Accept
+  type t =
+    | Single_realm of Principal.Name.t authorize
+    | Cross_realm of Cross_realm_principal_name.t authorize
+  [@@deriving variants]
 
-  let accept_single allowed _ principal =
-    bool_to_auth (Principal.Name.equal allowed principal)
+  let create f = Single_realm f
+  let accept_all = Single_realm (fun _ _ -> `Accept)
+
+  let accept_single allowed =
+    Single_realm
+      (fun _ principal -> bool_to_auth (Principal.Name.equal allowed principal))
   ;;
 
-  let accept_multiple allowed _ principal =
-    bool_to_auth (Principal.Name.Set.mem allowed principal)
+  let accept_multiple allowed =
+    Single_realm
+      (fun _ principal -> bool_to_auth (Principal.Name.Set.mem allowed principal))
   ;;
+
+  module Cross_realm = struct
+    let create f = Cross_realm f
+
+    let accept_single allowed =
+      Cross_realm
+        (fun _ principal ->
+           bool_to_auth (Cross_realm_principal_name.equal allowed principal))
+    ;;
+
+    let accept_multiple allowed =
+      Cross_realm
+        (fun _ principal ->
+           bool_to_auth (Cross_realm_principal_name.Set.mem allowed principal))
+    ;;
+  end
 end
 
 module Anon = struct
   type t = Principal.Name.t option authorize
 
-  let of_krb ?(on_anon = `Accept) auth addr maybe_principal =
+  let of_krb ?(on_anon = `Accept) f addr maybe_principal =
     match maybe_principal with
     | None -> on_anon
-    | Some principal -> auth addr principal
+    | Some principal -> f addr principal
   ;;
 
   let create f = f
-  let accept_all = of_krb Krb.accept_all
-  let accept_single accepted = of_krb (Krb.accept_single accepted)
-  let accept_multiple accepted = of_krb (Krb.accept_multiple accepted)
+  let accept_all = of_krb (fun _ _ -> `Accept)
+
+  let accept_single allowed =
+    of_krb (fun _ principal -> bool_to_auth (Principal.Name.equal allowed principal))
+  ;;
+
+  let accept_multiple allowed =
+    of_krb (fun _ principal -> bool_to_auth (Principal.Name.Set.mem allowed principal))
+  ;;
 end
 
 include Krb
 
-let krb_of_anon auth_anon addr principal = auth_anon addr (Some principal)
-let anon_of_krb = Anon.of_krb
+let krb_of_anon auth_anon = create (fun addr principal -> auth_anon addr (Some principal))
 
 module For_internal_use = struct
-  let authorize auth addr principal = auth addr principal
+  let authorize auth addr principal =
+    match auth with
+    | Single_realm single_auth ->
+      single_auth addr (Principal.Name.of_cross_realm principal)
+    | Cross_realm cr_auth -> cr_auth addr principal
+  ;;
+
+  let allows_cross_realm = function
+    | Single_realm _ -> false
+    | Cross_realm _ -> true
+  ;;
 
   module Anon = struct
     let authorize auth addr maybe_principal = auth addr maybe_principal

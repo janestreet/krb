@@ -3,10 +3,10 @@ include Config_gen_intf
 
 module Shared = struct
   type t =
-    { realm : string option [@sexp.option]
+    { pre_v5_assumed_realm : string option [@sexp.option]
     ; host_keytab_path : string option [@sexp.option]
     ; user_keytab_dir_template : string option [@sexp.option]
-    ; domain_name : string option option [@sexp.option]
+    ; default_domain : string option option [@sexp.option]
     ; debug_log_config : Debug_log_config.Stable.V1.t option [@sexp.option]
     ; verbose_errors : bool option [@sexp.option]
     ; am_sandboxed : bool option [@sexp.option]
@@ -38,13 +38,14 @@ let make ~default ~help_message =
       let fields =
         Fields.fold
           ~init:[]
-          ~realm:
+          ~pre_v5_assumed_realm:
             (field
                [%sexp_of: string]
                [ "\n\
-                 \  The realm to attach to principals constructed with \
-                  [Krb.Principal.Name].\n\
-                 \  This should usually be a capitalized version of [domain_name].\n"
+                  When using Protocol V4 and below, clients don't know the realm of \
+                  their peer and assume they are in [pre_v5_assumed_realm]. Protocol V5 \
+                  added support for cross-realm authentication and started sending the \
+                  realm as part of the handshake."
                ])
           ~host_keytab_path:
             (field
@@ -62,10 +63,13 @@ let make ~default ~help_message =
                    \  be filled in with the currently running user.\n"
                    username_template
                ])
-          ~domain_name:
+          ~default_domain:
             (field
                [%sexp_of: string option]
-               [ "\n  The domain name of hosts in this realm.\n" ])
+               [ "\n\
+                 \  The default domain name of hosts in this realm. This value will be \
+                  used to fully qualify hostnames when constructing service principals.\n\n"
+               ])
           ~debug_log_config:
             (field
                [%sexp_of: Debug_log_config.Stable.V1.t]
@@ -155,7 +159,7 @@ let make ~default ~help_message =
           ()
     ;;
 
-    let realm = get_with_default Fields.realm
+    let pre_v5_assumed_realm = get_with_default Fields.pre_v5_assumed_realm
     let host_keytab_path = get_with_default Fields.host_keytab_path
 
     let user_keytab_dir_template =
@@ -171,17 +175,17 @@ let make ~default ~help_message =
         ~with_:username
     ;;
 
-    let domain_name = get_with_default Fields.domain_name
+    let default_domain = get_with_default Fields.default_domain
     let debug_log_config = get_with_default Fields.debug_log_config
     let verbose_errors = get_with_default Fields.verbose_errors
     let am_sandboxed = get_with_default Fields.am_sandboxed
     let print_debug_messages = List.length debug_log_config > 0
 
     let t =
-      { realm = Some realm
+      { pre_v5_assumed_realm = Some pre_v5_assumed_realm
       ; host_keytab_path = Some host_keytab_path
       ; user_keytab_dir_template = Some user_keytab_dir_template
-      ; domain_name = Some domain_name
+      ; default_domain = Some default_domain
       ; debug_log_config = Some debug_log_config
       ; verbose_errors = Some verbose_errors
       ; am_sandboxed = Some am_sandboxed

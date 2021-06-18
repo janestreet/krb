@@ -15,10 +15,10 @@ open! Core
 
 module type S = sig
   type t =
-    { realm : string option
+    { pre_v5_assumed_realm : string option
     ; host_keytab_path : string option
     ; user_keytab_dir_template : string option
-    ; domain_name : string option option
+    ; default_domain : string option option
     ; debug_log_config : Debug_log_config.t option
     ; verbose_errors : bool option
     ; am_sandboxed : bool option
@@ -28,11 +28,11 @@ module type S = sig
   val username_template : string
   val environment_variable : string
   val t : t
-  val realm : string
+  val pre_v5_assumed_realm : string
   val host_keytab_path : string
   val user_keytab_dir_template : string
   val user_keytab_dir : username:string -> string
-  val domain_name : string option
+  val default_domain : string option
   val debug_log_config : Debug_log_config.t
   val verbose_errors : bool
   val am_sandboxed : bool
@@ -43,10 +43,10 @@ end
 
 module type Config_gen = sig
   type t =
-    { realm : string option
+    { pre_v5_assumed_realm : string option
     ; host_keytab_path : string option
     ; user_keytab_dir_template : string option
-    ; domain_name : string option option
+    ; default_domain : string option option
     ; debug_log_config : Debug_log_config.t option
     ; verbose_errors : bool option
     ; am_sandboxed : bool option

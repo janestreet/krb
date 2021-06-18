@@ -60,10 +60,25 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   ;;
 
   let handshake_exn ~authorize ~acting_as ~principal ~peer_addr backend =
+    (* Attempting to get the realm using [Realm.default ()] or any function that
+       relies on the [Context_sequencer] causes issues with the netkit simulator
+       due to how async is handled ([Netkit_simulator.wait] in [netkit_krb_tests.ml]).
+
+       For now we have a fixed realm which should be fine in test environments.
+       A new version of this protocol will have to be minted for cross-realm support.
+    *)
+    let realm = Krb_internal_public.Config.pre_v5_assumed_realm in
+    let my_principal = Principal.Name.with_realm ~realm principal in
     syn_exn ~acting_as backend principal
+    >>| Principal.Name.with_realm ~realm
     >>= fun other_principal ->
     let authorize_result =
-      Authorizer.run ~authorize ~acting_as ~peer_address:peer_addr other_principal
+      Authorizer.run
+        ~authorize
+        ~acting_as
+        ~my_principal
+        ~peer_address:peer_addr
+        ~peer_principal:other_principal
     in
     ack_exn ~acting_as backend authorize_result
     >>|? fun () ->
@@ -71,7 +86,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       Connection.create_for_test_mode
         ~backend
         ~conn_type:Auth
-        ~my_principal:principal
+        ~my_principal
         ~peer_principal:other_principal
     in
     conn, authorize_result
