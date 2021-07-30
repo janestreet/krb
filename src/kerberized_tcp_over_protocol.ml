@@ -37,18 +37,18 @@ module Client = struct
         backend
   ;;
 
-  let handshake
-        (type backend conn)
-        (module Protocol : Protocol_with_test_mode_intf.S
-          with type protocol_backend = backend
-           and type Connection.t = conn)
-        ~create_backend
-        ?override_supported_versions
-        ~authorize
-        ~krb_mode_with_client_cred_cache
-        ~socket
-        ~tcp_reader
-        ~tcp_writer
+  let[@warning "-16"] handshake
+                        (type backend conn)
+                        (module Protocol : Protocol_with_test_mode_intf.S
+                          with type protocol_backend = backend
+                           and type Connection.t = conn)
+                        ~create_backend
+                        ?override_supported_versions
+                        ~authorize
+                        ~krb_mode_with_client_cred_cache
+                        ~socket
+                        ~tcp_reader
+                        ~tcp_writer
     =
     let open Deferred.Or_error.Let_syntax in
     let%bind backend =
@@ -63,16 +63,16 @@ module Client = struct
       socket
   ;;
 
-  let handshake_sock
-        (type backend conn)
-        (module Protocol : Protocol_with_test_mode_intf.S
-          with type protocol_backend = backend
-           and type Connection.t = conn)
-        ~create_backend
-        ?override_supported_versions
-        ~authorize
-        ~krb_mode_with_client_cred_cache
-        ~socket
+  let[@warning "-16"] handshake_sock
+                        (type backend conn)
+                        (module Protocol : Protocol_with_test_mode_intf.S
+                          with type protocol_backend = backend
+                           and type Connection.t = conn)
+                        ~create_backend
+                        ?override_supported_versions
+                        ~authorize
+                        ~krb_mode_with_client_cred_cache
+                        ~socket
     =
     let open Deferred.Or_error.Let_syntax in
     let%bind backend = create_backend ~socket |> Deferred.return in

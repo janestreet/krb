@@ -258,7 +258,7 @@ module V0 = struct
     type 'a with_init_args =
       Cred_cache.t -> Krb_flags.Ap_req.t list -> service:string -> hostname:string -> 'a
 
-    let mk_req auth_context ccache ?(flags = []) ~service ~hostname =
+    let[@warning "-16"] mk_req auth_context ccache ?(flags = []) ~service ~hostname =
       let tag_arguments =
         lazy [%message (ccache : Cred_cache.t) (service : string) (hostname : string)]
       in
