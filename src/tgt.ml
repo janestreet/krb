@@ -26,11 +26,10 @@ module Cross_realm = struct
   let get_cached_tgt ?valid_for_at_least ~cred_cache principal_name =
     Cred_cache.Cross_realm.principal cred_cache
     >>=? fun cred_cache_principal_name ->
-    if
-      not
-        ([%compare.equal: Cross_realm_principal_name.t]
-           principal_name
-           cred_cache_principal_name)
+    if not
+         ([%compare.equal: Cross_realm_principal_name.t]
+            principal_name
+            cred_cache_principal_name)
     then
       Deferred.Or_error.error_s
         [%message

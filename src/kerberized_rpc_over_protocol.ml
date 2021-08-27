@@ -262,11 +262,10 @@ module For_testing = struct
         ~krb_mode:(Mode.Test_with_principal service)
         ~authorize:
           (Authorize.create (fun (`Inet (client_host, _client_port)) client_principal ->
-             if
-               [%compare.equal: Principal.Name.t] client client_principal
-               && [%compare.equal: Unix.Inet_addr.t]
-                    client_host
-                    (Unix.Inet_addr.of_string host)
+             if [%compare.equal: Principal.Name.t] client client_principal
+             && [%compare.equal: Unix.Inet_addr.t]
+                  client_host
+                  (Unix.Inet_addr.of_string host)
              then `Accept
              else `Reject))
       >>= fun server ->
@@ -275,13 +274,12 @@ module For_testing = struct
         with_client
           ~authorize:
             (Authorize.create (fun server_address server_principal ->
-               if
-                 [%compare.equal: Principal.Name.t] service server_principal
-                 && [%compare.equal: Socket.Address.Inet.t]
-                      server_address
-                      (Socket.Address.Inet.create
-                         (Unix.Inet_addr.of_string host)
-                         ~port)
+               if [%compare.equal: Principal.Name.t] service server_principal
+               && [%compare.equal: Socket.Address.Inet.t]
+                    server_address
+                    (Socket.Address.Inet.create
+                       (Unix.Inet_addr.of_string host)
+                       ~port)
                then `Accept
                else `Reject))
           ~krb_mode

@@ -295,12 +295,18 @@ module Writer = struct
   ;;
 end
 
-(* copied from RPC (which in turn is copied from reader0.ml) *)
-let default_max_message_size = 100 * 1024 * 1024
+let default_max_message_size =
+  Lazy.from_fun (fun () ->
+    match Sys.getenv "KRB_RPC_MAX_MESSAGE_SIZE" with
+    | None ->
+      (* copied from RPC (which in turn is copied from reader0.ml) *)
+      100 * 1024 * 1024
+    | Some max_message_size -> Int.of_string max_message_size)
+;;
 
 let of_connection
       ?(on_done_with_internal_buffer = `Do_nothing)
-      ?(max_message_size = default_max_message_size)
+      ?(max_message_size = force default_max_message_size)
       connection
   =
   if max_message_size < 0
@@ -438,7 +444,7 @@ module Tcp = struct
     in
     let handle_rpc_client addr (reader, writer) =
       let max_message_size =
-        Option.value max_message_size ~default:default_max_message_size
+        Option.value max_message_size ~default:(force default_max_message_size)
       in
       let transport = Rpc.Transport.of_reader_writer ~max_message_size reader writer in
       handle_client addr transport None
