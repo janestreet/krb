@@ -1,51 +1,29 @@
 open! Core
 open! Async
-open Import
+open! Import
 
-(** A credentials cache holds Kerberos credentials (aka tickets) for a particular
-    principal. At a high level, they prevent users from having to constantly talk to the
-    KDC to get tickets (until the existing ones expire).
+include module type of Cred_cache0 (** @inline *)
 
-    There are many different types of credential caches. The common ones are:
+(** Return number of active credential renewal loops, as started by calls to
+    [keep_valid_indefintely]. Note that it avoids creating a new loop for credentials that
+    are already being renewed, even if [keep_valid_indefinitely] is called multiple times
+    on the same cred cache with the same principal + keytab. *)
+val num_active_renewal_jobs : unit -> int
 
-    FILE   : Credentials are stored for a single principal in a file
-    DIR    : Credentials are stored for multiple principals in a directory
-    MEMORY : Credentials are stored for a single principal in memory
-*)
+(** If this cred cache is expected to contain a TGT, keep that TGT valid. If it is a
+    S4U2Self cache, keep the expected ticket valid.
 
-type t = Internal.Cred_cache.t
+    A [keytab] should only be provided for TGT caches. It defaults to the [User] keytab if
+    none is provided.
 
-(** [default] returns Kerberos's notion of a "default" credential cache. This is
-    determined by the following steps, in descending order:
-    - KRB5CCNAME environment variable
-    - default_ccache_name variable in [libdefaults] in /etc/krb5.conf
-    - DEFCCNAME build parameter (usually FILE:/tmp/krb5cc_%{uid}) *)
-val default : unit -> t Deferred.Or_error.t
-
-(** The principal associated with [default] *)
-val default_principal : unit -> Principal.Name.t Deferred.Or_error.t
-
-(** The principal associated with the credential cache supplied *)
-val principal : t -> Principal.Name.t Deferred.Or_error.t
-
-(** A shared MEMORY [t] for [principal]. If a previous call succeeded for the same
-    [principal], the same [t] is returned. The returned [t] is never freed, so this
-    function should not be called with an unbounded number of unique [principal]s. *)
-val in_memory_for_principal : Principal.Name.t -> t Deferred.Or_error.t
-
-(** Initialize [t] with the given principal and credentials. This function updates [t]
-    atomically for FILE cred caches. *)
-val initialize_with_creds
-  :  t
-  -> Principal.t
-  -> Internal.Credentials.t list
+    A [server_cred_cache] should only be provided if [t] is a S4U2Self cache. The default
+    cred cache is used if none is provided. *)
+val keep_valid
+  :  ?refresh_every:Time.Span.t (** default: 30m *)
+  -> ?on_error:[ `Ignore | `Raise | `Call of Error.t -> unit ]
+  (** default: call [Log.Global.error] *)
+  -> ?keytab:Keytab.Path.t
+  -> ?server_cred_cache:t
+  -> ?abort:unit Deferred.t
+  -> t
   -> unit Deferred.Or_error.t
-
-(** Initializes the shared MEMORY cache associated with the principal of [t]
-    (see [in_memory_for_principal]) with the credentials from [t]. *)
-val initialize_in_memory_with_creds_from : t -> t Deferred.Or_error.t
-
-module Cross_realm : sig
-  val principal : t -> Cross_realm_principal_name.t Deferred.Or_error.t
-  val in_memory_for_principal : Cross_realm_principal_name.t -> t Deferred.Or_error.t
-end

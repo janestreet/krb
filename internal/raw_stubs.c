@@ -14,6 +14,21 @@
 #include <caml/threads.h>
 #include "ocaml_utils.h"
 
+/* Well, this is nasty. This function is minimally documented (see
+   https://k5wiki.kerberos.org/wiki/Projects/Services4User#API), but doesn't appear in the
+   header file. However, we know it exists with this signature from that doc, so if we
+   declare it here all is well. There's a test that makes use of this inside a Kerberos
+   sandbox so we should notice if something changes.
+
+   We could alternatively use this via GSSAPI, which has an actual public way to use it.
+   But that involves a ton of extra indirection, and generally feels a bit silly given
+   that we don't want any of the GSSAPI stuff around it. */
+krb5_error_code KRB5_CALLCONV
+krb5_get_credentials_for_user(krb5_context context, krb5_flags options,
+                              krb5_ccache ccache, krb5_creds *in_creds,
+                              krb5_data *subject_cert,
+                              krb5_creds **out_creds);
+
 /* Documentation for the krb5 API is available here: http://web.mit.edu/kerberos
 
    The below bindings were originally based off:
@@ -1995,18 +2010,10 @@ caml_krb5_creds_create(value v_context_token, value v_client,
   CAMLreturn(wrap_result(o_creds, retval));
 }
 
-CAMLprim value
-caml_krb5_get_credentials(value v_context_token, value v_options,
-                          value v_ccache, value v_in_creds) {
-  CAMLparam4(v_context_token, v_options, v_ccache, v_in_creds);
-  CAMLlocal1(o_out_creds);
+krb5_flags parse_get_credentials_flags(value v_options) {
+  CAMLparam1(v_options);
 
-  krb5_context context = the_context(v_context_token);
   krb5_flags options = 0;
-  krb5_creds in_creds = get_val(krb5_creds, v_in_creds);
-  krb5_creds *out_creds;
-  krb5_error_code retval;
-  krb5_ccache ccache = get_val(krb5_ccache, v_ccache);
 
   while(v_options != Val_int(0)) {
     switch(Int_val(Field(v_options, 0))) {
@@ -2014,11 +2021,27 @@ caml_krb5_get_credentials(value v_context_token, value v_options,
     case 1: options |= KRB5_GC_USER_USER; break;
     case 2: options |= KRB5_GC_NO_STORE;  break;
     default:
-      caml_invalid_argument("krb5_get_credentials: invalid krb5_flags");
+      caml_invalid_argument("parse_get_credentials_flags: invalid krb5_flags");
     }
 
     v_options = Field(v_options, 1);
   }
+
+  CAMLreturnT(krb5_flags, options);
+}
+
+CAMLprim value
+caml_krb5_get_credentials(value v_context_token, value v_options,
+                          value v_ccache, value v_in_creds) {
+  CAMLparam4(v_context_token, v_options, v_ccache, v_in_creds);
+  CAMLlocal1(o_out_creds);
+
+  krb5_context context = the_context(v_context_token);
+  krb5_flags options = parse_get_credentials_flags(v_options);
+  krb5_creds in_creds = get_val(krb5_creds, v_in_creds);
+  krb5_creds *out_creds;
+  krb5_error_code retval;
+  krb5_ccache ccache = get_val(krb5_ccache, v_ccache);
 
   caml_release_runtime_system();
   retval = krb5_get_credentials(context,
@@ -2026,6 +2049,41 @@ caml_krb5_get_credentials(value v_context_token, value v_options,
                                 ccache,
                                 &in_creds,
                                 &out_creds);
+  caml_acquire_runtime_system();
+
+  if(retval) {
+    CAMLreturn(wrap_result(Val_unit, retval));
+  } else {
+    o_out_creds = create_krb5_creds();
+    set_val(krb5_creds, o_out_creds, *out_creds);
+    /* We make a copy of the top-level struct, so we need to free it. We can't use
+       krb5_free_creds, since that would also free the contained malloc'ed data regions */
+    free(out_creds);
+
+    CAMLreturn(wrap_result(o_out_creds, retval));
+  }
+}
+
+CAMLprim value
+caml_krb5_get_credentials_for_user(value v_context_token, value v_options,
+                                   value v_ccache, value v_in_creds) {
+  CAMLparam4(v_context_token, v_options, v_ccache, v_in_creds);
+  CAMLlocal1(o_out_creds);
+
+  krb5_context context = the_context(v_context_token);
+  krb5_flags options = parse_get_credentials_flags(v_options);
+  krb5_creds in_creds = get_val(krb5_creds, v_in_creds);
+  krb5_creds *out_creds;
+  krb5_error_code retval;
+  krb5_ccache ccache = get_val(krb5_ccache, v_ccache);
+
+  caml_release_runtime_system();
+  retval = krb5_get_credentials_for_user(context,
+                                         options,
+                                         ccache,
+                                         &in_creds,
+                                         NULL,
+                                         &out_creds);
   caml_acquire_runtime_system();
 
   if(retval) {

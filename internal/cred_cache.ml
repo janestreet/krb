@@ -79,6 +79,14 @@ module Raw = struct
     -> Credentials.Raw.t Krb_result.t
     = "caml_krb5_get_credentials"
 
+  external get_credentials_for_user
+    :  Context.t
+    -> Krb_flags.Get_credentials.t list
+    -> t
+    -> request:Credentials.Raw.t
+    -> Credentials.Raw.t Krb_result.t
+    = "caml_krb5_get_credentials_for_user"
+
   external get_renewed_creds
     :  Context.t
     -> Principal.Raw.t
@@ -104,6 +112,7 @@ end
 type t =
   { raw : Raw.t
   ; full_name : Full_name.t
+  ; type_ : [ `Normal | `S4U2Self of Principal.t ]
   }
 [@@deriving fields]
 
@@ -113,11 +122,11 @@ let hash t = String.hash t.full_name
 let hash_fold_t state t = Hash.fold_string state t.full_name
 let to_raw = raw
 
-let of_raw raw =
+let of_raw ?(type_ = `Normal) raw =
   let tag_result full_name = [%message (full_name : Full_name.t)] in
   let info = Krb_info.create ~tag_result "[krb5_cc_get_full_name]" in
   Context_sequencer.enqueue_job_with_info ~info ~f:(fun c -> Raw.full_name c raw)
-  >>|? fun full_name -> { raw; full_name }
+  >>|? fun full_name -> { raw; full_name; type_ }
 ;;
 
 module Cred_cache_cursor = Cursor.Make (struct
@@ -163,19 +172,19 @@ let initialize t principal =
     Raw.initialize c t.raw (Principal.to_raw principal))
 ;;
 
-let new_unique cc_type =
+let new_unique ?type_ cc_type =
   let tag_arguments = lazy [%message (cc_type : Cache_type.t)] in
   let info = Krb_info.create ~tag_arguments "[krb5_cc_new_unique]" in
   Context_sequencer.enqueue_job_with_info ~info ~f:(fun c ->
     Raw.new_unique c (Cache_type.to_string cc_type))
   >>=? fun raw ->
   Context_sequencer.add_finalizer raw ~f:Raw.free;
-  of_raw raw
+  of_raw ?type_ raw
 ;;
 
-let create cc_type principal =
+let create ?type_ cc_type principal =
   let open Deferred.Or_error.Let_syntax in
-  let%bind t = new_unique cc_type in
+  let%bind t = new_unique ?type_ cc_type in
   let%bind () = initialize t principal in
   return t
 ;;
@@ -256,10 +265,12 @@ let creds t =
   |> Deferred.ok
 ;;
 
-let get_credentials
+let get_credentials'
+      ~tag
+      ~raw:raw_func
       ?(tag_error_with_all_credentials = Config.verbose_errors)
       ?(ensure_cached_valid_for_at_least = Time.Span.of_min 10.)
-      ~flags
+      ~(flags : Krb_flags.Get_credentials.t list)
       t
       ~request
   =
@@ -290,9 +301,9 @@ let get_credentials
          need to call `kinit` to get fresh credentials."
     | _ -> return Sexp.unit
   in
-  let info = Krb_info.create ~tag_arguments ~tag_error "[krb5_get_credentials]" in
+  let info = Krb_info.create ~tag_arguments ~tag_error tag in
   Context_sequencer.enqueue_job_with_info ~info ~f:(fun c ->
-    Raw.get_credentials c flags t.raw ~request:(Credentials.to_raw request))
+    raw_func c flags t.raw ~request:(Credentials.to_raw request))
   >>=? fun credentials_raw ->
   Context_sequencer.add_finalizer credentials_raw ~f:Credentials.Raw.free;
   Credentials.of_raw credentials_raw
@@ -314,6 +325,10 @@ let get_credentials
           ~_:(force tag_arguments : Sexp.t)
           ~_:(error : Sexp.t)])
   else Deferred.Or_error.return credentials
+;;
+
+let get_credentials =
+  get_credentials' ~raw:Raw.get_credentials ~tag:"[krb5_get_credentials]"
 ;;
 
 let get_cached_tgt ?ensure_valid_for_at_least t =
@@ -343,7 +358,7 @@ let renew t cred =
 ;;
 
 module Expert = struct
-  let new_unique = new_unique
+  let new_unique cc_type = new_unique cc_type
   let cache_type = cache_type
   let creds = creds
 
@@ -365,4 +380,10 @@ module Expert = struct
   ;;
 
   let full_name = full_name
+
+  let get_credentials_for_user =
+    get_credentials'
+      ~raw:Raw.get_credentials_for_user
+      ~tag:"[krb5_get_credentials_for_user]"
+  ;;
 end

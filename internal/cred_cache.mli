@@ -15,12 +15,22 @@ val hash : t -> int
 (** the credentials cache indicated by the environment variable KRB5CCNAME *)
 val default : unit -> t Deferred.Or_error.t
 
+(** [`Normal] cred caches should have a TGT, in addition to potentially other tickets. In
+    other cases (such as the result of an S4U2Self-based cache) the cred cache may not be
+    expected to have a TGT. By tagging caches with this extra information, we can have
+    more reasonable behavior in instances of trying to renew a cache and the like. *)
+val type_ : t -> [ `Normal | `S4U2Self of Principal.t ]
+
 val initialize : t -> Principal.t -> unit Deferred.Or_error.t
 
 (** Creating a cred cache of types [FILE] or [DIR] (and possibly others) leaks files on
     disk. The finalizer for [Cred_cache.t] closes the file and frees the memory associated
     with it, but the file doesn't get removed from disk. *)
-val create : Cache_type.t -> Principal.t -> t Deferred.Or_error.t
+val create
+  :  ?type_:[ `Normal | `S4U2Self of Principal.t ] (** Defaults to [`Normal] *)
+  -> Cache_type.t
+  -> Principal.t
+  -> t Deferred.Or_error.t
 
 val principal : t -> Principal.t Deferred.Or_error.t
 val store : t -> Credentials.t -> unit Deferred.Or_error.t
@@ -72,6 +82,17 @@ module Expert : sig
   val resolve : string -> t Deferred.Or_error.t
   val full_name : t -> string
   val creds : t -> Credentials.t list Deferred.Or_error.t
+
+  (** See docs for [get_credentials]. The difference is that this function can get fresh
+      tickets from the KDC where [principal t] is the server principal, rather than the
+      client. The client may be any existing principal. *)
+  val get_credentials_for_user
+    :  ?tag_error_with_all_credentials:bool
+    -> ?ensure_cached_valid_for_at_least:Time.Span.t
+    -> flags:Krb_flags.Get_credentials.t list
+    -> t
+    -> request:Credentials.t
+    -> Credentials.t Deferred.Or_error.t
 end
 
 module Raw : sig

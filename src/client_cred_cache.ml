@@ -18,7 +18,11 @@ let cred_cache = function
 let of_cred_cache cred_cache =
   let open Deferred.Or_error.Let_syntax in
   let%bind principal = Cred_cache.principal cred_cache in
-  let%bind () = Tgt.ensure_valid ~cred_cache ~keytab:User principal in
+  let%bind () =
+    match Krb_internal_public.Cred_cache.type_ cred_cache with
+    | `Normal -> Tgt.ensure_valid ~cred_cache ~keytab:User principal
+    | `S4U2Self _ -> return ()
+  in
   return (Single_cache cred_cache)
 ;;
 
