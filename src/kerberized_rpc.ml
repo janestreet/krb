@@ -1,7 +1,6 @@
 open Core
 open Async
 open Import
-module Auth_context = Internal.Auth_context
 module Transport = Kerberized_rpc_transport
 
 type 'a async_rpc_args =

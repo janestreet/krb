@@ -1,9 +1,7 @@
 open Core
 open Async
 open Import
-module Credentials = Internal.Credentials
 module Debug = Internal.Debug
-module Keytab_entry = Internal.Keytab_entry
 
 type 'a with_krb_args =
   ?cred_cache:Cred_cache.t -> authorize:Authorize.t -> krb_mode:Mode.Client.t -> 'a
@@ -140,28 +138,24 @@ module Server = struct
           handle_client
           server_protocol
       =
-      Deferred.Or_error.try_with_join
-        ~run:
-          `Schedule
-        ~rest:`Log
-        (fun () ->
-           Tcp.Server.create
-             ?max_connections
-             ?backlog
-             ?drop_incoming_connections
-             ?buffer_age_limit
-             (* It is never safe to set this to `Raise, since this would allow a single
-                misbehaving client to bring down the TCP server (via something as simple as
-                "connection reset by peer" *)
-             ~on_handler_error:`Ignore
-             where_to_listen
-             (handler_from_server_protocol
-                ?on_kerberos_error
-                ?on_handshake_error
-                ?on_handler_error
-                handle_client
-                server_protocol)
-           |> Deferred.ok)
+      Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
+        Tcp.Server.create
+          ?max_connections
+          ?backlog
+          ?drop_incoming_connections
+          ?buffer_age_limit
+          (* It is never safe to set this to `Raise, since this would allow a single
+             misbehaving client to bring down the TCP server (via something as simple as
+             "connection reset by peer" *)
+          ~on_handler_error:`Ignore
+          where_to_listen
+          (handler_from_server_protocol
+             ?on_kerberos_error
+             ?on_handshake_error
+             ?on_handler_error
+             handle_client
+             server_protocol)
+        |> Deferred.ok)
     ;;
 
     let krb_server_protocol ~authorize krb_mode =

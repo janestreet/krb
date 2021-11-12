@@ -3,7 +3,6 @@ open Async
 open Import
 module Cache_type = Internal.Cache_type
 module Credentials = Internal.Credentials
-module Debug = Internal.Debug
 
 module Cross_realm = struct
   (* empirically it seems tgts must be valid for more than 122 seconds. *)

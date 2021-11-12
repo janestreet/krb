@@ -1,6 +1,5 @@
 module Stable = struct
   open! Core.Core_stable
-  module Username = Username_kernel.Username.Stable
 
   module V1 = struct
     module User = struct

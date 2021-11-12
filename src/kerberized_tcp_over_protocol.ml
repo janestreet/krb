@@ -300,7 +300,7 @@ module Server = struct
 
   let krb_or_anon_server_protocol
         (type backend conn)
-        (module Backend : Protocol_backend_intf.S with type t = backend)
+        (module _ : Protocol_backend_intf.S with type t = backend)
         (module Protocol : Protocol_with_test_mode_intf.S
           with type protocol_backend = backend
            and type Connection.t = conn)
