@@ -65,7 +65,6 @@ let create_writer conn_type auth_context writer =
        Monitor.try_with
          ~run:
            `Schedule
-         ~rest:`Log
          ~name:"Kerberized_rw.create_writer"
          (fun () ->
             Reader.read_one_chunk_at_a_time plaintext_r ~handle_chunk
@@ -122,7 +121,7 @@ let create_reader conn_type auth_context ~writer reader =
       ~f:(Monitor.send_exn monitor);
     don't_wait_for
       (Monitor.try_with_or_error
-         ~rest:`Log
+         ~here:[%here]
          ~name:"Kerberized_rw.create_reader"
          (fun () ->
             let pipe =

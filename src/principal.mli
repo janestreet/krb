@@ -69,6 +69,15 @@ end
 val create : Name.t -> t Deferred.Or_error.t
 val name : t -> Name.t
 
+(** Constructs a principal [<service_name>/<canonicalized_hostname>], where the
+    canonicalized hostname is derived from [hostname] with the rules defined by the
+    Kerberos config (as described at
+    https://web.mit.edu/kerberos/krb5-devel/doc/admin/princ_dns.html). *)
+val service_with_canonicalized_hostname
+  :  service:string
+  -> hostname:string
+  -> t Deferred.Or_error.t
+
 module Cross_realm : sig
   val create : Cross_realm_principal_name.t -> t Deferred.Or_error.t
   val name : t -> Cross_realm_principal_name.t

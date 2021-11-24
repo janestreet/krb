@@ -9,7 +9,6 @@ let collect_errors writer_monitor ~f =
         (try_with
            ~run:
              `Schedule
-           ~rest:`Log
            ~name:"Rpc.Connection.collect_errors"
            f)
         Fn.id

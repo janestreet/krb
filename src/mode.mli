@@ -84,13 +84,8 @@ module Stable : sig
   module V4 : sig
     type nonrec 'a mode = 'a mode [@@deriving bin_io, compare, sexp]
 
-    module Client : sig
-      type t = Client.t [@@deriving bin_io, compare, sexp]
-    end
-
-    module Server : sig
-      type t = Server.t [@@deriving compare, sexp]
-    end
+    module Client : Stable_without_comparator with type t = Client.t
+    module Server : Stable_without_comparator with type t = Server.t
 
     module Client_with_auth_conn_type :
       Stable_without_comparator with type t = Client_with_auth_conn_type.t

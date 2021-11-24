@@ -11,6 +11,14 @@ module Raw = struct
   external realm : t -> string = "caml_krb5_princ_realm"
   external is_config_principal : Context.t -> t -> bool = "caml_krb5_is_config_principal"
   external default_realm : Context.t -> string Krb_result.t = "caml_krb5_default_realm"
+
+  external sname_to_principal
+    :  Context.t
+    -> hostname:string
+    -> sname:string
+    -> canonicalize_hostname:bool
+    -> t Krb_result.t
+    = "caml_krb5_sname_to_principal"
 end
 
 type t =
@@ -57,4 +65,13 @@ let salt t =
 let default_realm () =
   let info = Krb_info.create "[krb5_default_realm]" in
   Context_sequencer.enqueue_job_with_info ~info ~f:(fun c -> Raw.default_realm c)
+;;
+
+let of_hostname_and_service ~hostname ~service ~canonicalize_hostname =
+  let info = Krb_info.create "[krb5_sname_to_principal]" in
+  Context_sequencer.enqueue_job_with_info ~info ~f:(fun c ->
+    Raw.sname_to_principal c ~hostname ~sname:service ~canonicalize_hostname)
+  >>=? fun principal ->
+  Context_sequencer.add_finalizer principal ~f:Raw.free;
+  of_raw principal
 ;;

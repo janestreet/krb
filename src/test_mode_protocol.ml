@@ -94,7 +94,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
   module Client = struct
     let handshake ~authorize ~principal ~server_addr backend =
-      Deferred.Or_error.try_with_join ~run:`Now ~rest:`Log (fun () ->
+      Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
         handshake_exn
           ~authorize
           ~acting_as:Client
@@ -117,7 +117,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       Deferred.Or_error.try_with
         ~run:
           `Schedule
-        ~rest:`Log
+        ~here:[%here]
         (fun () -> serve_exn ~authorize ~principal ~peer_addr:client_addr backend)
       >>| function
       | Ok result -> result

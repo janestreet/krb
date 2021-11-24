@@ -12,6 +12,12 @@ val realm : t -> string
 val salt : t -> Data.t Deferred.Or_error.t
 val default_realm : unit -> string Deferred.Or_error.t
 
+val of_hostname_and_service
+  :  hostname:string
+  -> service:string
+  -> canonicalize_hostname:bool
+  -> t Deferred.Or_error.t
+
 module Raw : sig
   type t
 

@@ -1746,7 +1746,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       Deferred.Or_error.try_with
         ~run:
           `Schedule
-        ~rest:`Log
+        ~here:[%here]
         (fun () ->
            handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend)
       >>| function

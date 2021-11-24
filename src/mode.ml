@@ -16,7 +16,7 @@ module Stable = struct
 
     module Server = struct
       type t = (Server_key_source.V2.t * Conn_type_preference.V1.t) mode
-      [@@deriving compare, sexp]
+      [@@deriving bin_io, compare, sexp]
     end
 
     module Client_with_auth_conn_type = struct

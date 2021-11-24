@@ -340,6 +340,32 @@ caml_krb5_unparse_name(value v_context_token, value v_principal)
 }
 
 CAMLprim value
+caml_krb5_sname_to_principal(value v_context_token, value v_hostname, value v_sname, value v_type) {
+  CAMLparam4(v_context_token, v_hostname, v_sname, v_type);
+  CAMLlocal1(o_princ);
+
+  krb5_context context = the_context(v_context_token);
+  krb5_error_code retval;
+  const char *hostname = str_dup(v_hostname);
+  const char *sname = str_dup(v_sname);
+  krb5_int32 type = Bool_val(v_type) ? KRB5_NT_SRV_HST : KRB5_NT_UNKNOWN;
+  krb5_principal princ = NULL;
+
+  caml_release_runtime_system();
+  retval = krb5_sname_to_principal(context, hostname, sname, type, &princ);
+  caml_acquire_runtime_system();
+
+  if(retval)
+    CAMLreturn(wrap_result(Val_unit, retval));
+  else
+  {
+    o_princ = create_krb5_principal();
+    set_val(krb5_principal, o_princ, princ);
+    CAMLreturn(wrap_result(o_princ, retval));
+  }
+}
+
+CAMLprim value
 caml_krb5_kt_close(value v_context_token, value v_keytab)
 {
   CAMLparam2(v_context_token, v_keytab);

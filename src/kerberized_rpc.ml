@@ -227,7 +227,6 @@ module Connection = struct
     Deferred.Or_error.try_with
       ~run:
         `Schedule
-      ~rest:`Log
       (fun () -> f t)
     >>= fun result -> Rpc.Connection.close t >>| fun () -> result
   ;;

@@ -79,11 +79,7 @@ module Client = struct
       ~krb_mode
       where_to_connect
     >>=? fun (kerberized_rw, server_principal) ->
-    Deferred.Or_error.try_with
-      ~run:
-        `Schedule
-      ~rest:`Log
-      (fun () -> f kerberized_rw server_principal)
+    Deferred.Or_error.try_with ~here:[%here] (fun () -> f kerberized_rw server_principal)
     >>= fun result ->
     Writer.close (Kerberized_rw.plaintext_writer kerberized_rw)
     >>= fun () ->

@@ -237,16 +237,14 @@ module Server = struct
         backend_or_error
     =
     let monitor = Monitor.current () in
-    Monitor.try_with_or_error
-      ~rest:`Log
-      (fun () ->
-         let open Deferred.Result.Let_syntax in
-         let%bind backend =
-           match backend_or_error with
-           | Ok backend -> return backend
-           | Error error -> Deferred.Result.fail (`Krb_error error)
-         in
-         server_protocol ~peer backend)
+    Monitor.try_with_or_error ~here:[%here] (fun () ->
+      let open Deferred.Result.Let_syntax in
+      let%bind backend =
+        match backend_or_error with
+        | Ok backend -> return backend
+        | Error error -> Deferred.Result.fail (`Krb_error error)
+      in
+      server_protocol ~peer backend)
     >>= function
     | Error e -> return (handle_on_error ~monitor on_kerberos_error peer e)
     | Ok (Error (`Krb_error e)) ->
@@ -257,9 +255,7 @@ module Server = struct
       (* This can be logged in the servers [authorize] *)
       return ()
     | Ok (Ok connection) ->
-      Monitor.try_with_or_error
-        ~rest:`Log
-        (fun () -> handle_client peer connection)
+      Monitor.try_with_or_error ~here:[%here] (fun () -> handle_client peer connection)
       >>= (function
         | Error e -> return (handle_on_error ~monitor on_handler_error peer e)
         | Ok () -> return ())

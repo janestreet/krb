@@ -128,6 +128,10 @@ let name = Name.of_principal
 let create = Name.to_principal
 let check_password = Internal.Credentials.check_password
 
+let service_with_canonicalized_hostname ~service ~hostname =
+  of_hostname_and_service ~hostname ~service ~canonicalize_hostname:true
+;;
+
 module Cross_realm = struct
   let create name =
     Internal.Principal.of_string (Cross_realm_principal_name.to_string name)
