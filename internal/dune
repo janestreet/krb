@@ -1,5 +1,5 @@
 (library (name krb_internal_public) (public_name krb.internal)
- (libraries async core_kernel.core env_config hex_encode)
+ (libraries async core env_config hex_encode)
  (c_flags (:standard (:include krb5-cflags.sexp)) (-I /usr/include/et))
  (c_library_flags :standard (:include krb5-libs.sexp)) (c_names raw_stubs)
  (preprocess (pps ppx_jane)))
