@@ -44,7 +44,8 @@ module Connection : sig
         [kerberized_tcp.mli] for more details. *)
     -> ?on_handshake_error:
          [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
-    (** on_handshake_error defaults to [`Ignore] *)
+    (** on_handshake_error defaults to [`Ignore]. See [kerberized_tcp.mli] for more
+        details. *)
     -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
     (** [on_done_with_internal_buffer] determines if internal buffers are zeroed out after
         use. The default is [`Do_nothing]. *)

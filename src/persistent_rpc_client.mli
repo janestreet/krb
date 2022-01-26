@@ -4,17 +4,14 @@ open! Async
 (** An instantiation of [Persistent_connection] for creating persistent kerberized rpc
     connections *)
 
-include
-  Persistent_connection.S
-  with type conn = Rpc.Connection.t
-   and type address = Host_and_port.t
+include Persistent_connection.S with type conn = Rpc.Connection.t
 
 (** Arguments passed through to [Persistent_connection.Rpc.create].
     See [Persistent_connection] for documentation. *)
 type 'a persistent_connection_args =
   server_name:string
   -> ?log:Log.t
-  -> ?on_event:(Event.t -> unit Deferred.t)
+  -> ?on_event:(Host_and_port.t Event.t -> unit Deferred.t)
   -> ?retry_delay:(unit -> Time.Span.t)
   -> 'a
 

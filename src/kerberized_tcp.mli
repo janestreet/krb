@@ -38,7 +38,7 @@ module Server : sig
   val create
     : (?on_kerberos_error:
         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
-       (** [on_kerberos_error] gets called for any kerberos related errors that occur
+       (** [on_kerberos_error] gets called for some kerberos related errors that occur
            during setup of a connection. This includes failure to de/encrypt messages
            during the setup phase, invalid service tickets sent by the client, etc. It
            defaults to logging via [Log.Global.error]. *)
@@ -46,7 +46,17 @@ module Server : sig
          [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
        (** [on_handshake_error] gets called for any non-kerberos related errors that occur
            during setup of a connection. This includes connectivity errors and version
-           negotiation errors. It defaults to [`Ignore] *)
+           negotiation errors (which includes kerberos mode mismatch between client and
+           server).
+
+           It defaults to [`Ignore].
+
+           Be careful alerting loudly about those errors or choosing [`Raise]. For
+           example, [on_handshake_error] may be called if the client crashes when
+           connecting to your server. And you probably don't want the server to raise an
+           oculus issue or send an eye message when someone kills the commander.
+           It may also be triggered by network gremlins: https://wiki/x/34H1Bw.
+       *)
        -> ?on_handler_error:
          [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
        (** [on_handler_error] gets called for any errors that occur within the handler

@@ -93,10 +93,14 @@ val kvno : ?cred_cache:Internal.Cred_cache.t -> t -> int Deferred.Or_error.t
 
 module Stable : sig
   module Name : sig
-    module V1 :
-      Stable_comparable.V1
-      with type t = Name.t
-      with type comparator_witness = Name.comparator_witness
+    module V1 : sig
+      type t = Name.t [@@deriving bin_io, compare, sexp]
+
+      include
+        Comparable.Stable.V1.S
+        with type comparable := Name.t
+        with type comparator_witness = Name.comparator_witness
+    end
   end
 end
 

@@ -5,7 +5,7 @@ include Persistent_connection.Rpc
 type 'a persistent_connection_args =
   server_name:string
   -> ?log:Log.t
-  -> ?on_event:(Event.t -> unit Deferred.t)
+  -> ?on_event:(Host_and_port.t Event.t -> unit Deferred.t)
   -> ?retry_delay:(unit -> Time.Span.t)
   -> 'a
 
@@ -43,5 +43,6 @@ let create'
         ~authorize
         ~krb_mode
         (Tcp.Where_to_connect.of_host_and_port ?bind_to_address { host; port }))
+    ~address:(module Host_and_port)
     get_addr
 ;;
