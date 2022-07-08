@@ -21,7 +21,7 @@ module type S = sig
     ; default_domain : string option option
     ; debug_log_config : Debug_log_config.t option
     ; verbose_errors : bool option
-    ; am_sandboxed : bool option
+    ; sandboxing_state : [ `None | `Sandboxed | `Exempted ] option
     }
   [@@deriving sexp_of]
 
@@ -36,6 +36,7 @@ module type S = sig
   val debug_log_config : Debug_log_config.t
   val verbose_errors : bool
   val am_sandboxed : bool
+  val am_exempt_from_sandbox : bool
 
   (** [true] iff [List.length debug_log_config > 0] *)
   val print_debug_messages : bool
@@ -49,7 +50,7 @@ module type Config_gen = sig
     ; default_domain : string option option
     ; debug_log_config : Debug_log_config.t option
     ; verbose_errors : bool option
-    ; am_sandboxed : bool option
+    ; sandboxing_state : [ `None | `Sandboxed | `Exempted ] option
     }
   [@@deriving sexp_of]
 

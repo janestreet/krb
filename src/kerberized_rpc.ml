@@ -12,6 +12,14 @@ type 'a async_rpc_args =
 module Connection = struct
   type t = Rpc.Connection.t
 
+  let handshake_handler_for_rpc = function
+    | `Ignore -> `Ignore
+    | `Raise -> `Raise
+    | `Call f ->
+      `Call
+        (fun addr exn -> f Handshake_error.Kind.Unexpected_or_no_client_bytes addr exn)
+  ;;
+
   let handle_client
         ?heartbeat_config
         ?handshake_timeout
@@ -54,7 +62,7 @@ module Connection = struct
       ~on_handshake_error
       (* A TCP handler error is an RPC handshake error, since the handler just does
          a handshake. *)
-      ~on_handler_error:on_handshake_error
+      ~on_handler_error:(handshake_handler_for_rpc on_handshake_error)
       ?on_done_with_internal_buffer
       ~authorize
       ~krb_mode
@@ -97,7 +105,7 @@ module Connection = struct
       ?max_message_size
       ?on_kerberos_error
       ~on_handshake_error
-      ~on_handler_error:on_handshake_error
+      ~on_handler_error:(handshake_handler_for_rpc on_handshake_error)
       ?on_done_with_internal_buffer
       ~authorize
       ~krb_mode
@@ -135,7 +143,7 @@ module Connection = struct
       ?buffer_age_limit
       ?on_kerberos_error
       ~on_handshake_error
-      ~on_handler_error:on_handshake_error
+      ~on_handler_error:(handshake_handler_for_rpc on_handshake_error)
       ?on_done_with_internal_buffer
       ~authorize
       ~krb_mode
@@ -225,8 +233,7 @@ module Connection = struct
       where_to_connect
     >>=? fun t ->
     Deferred.Or_error.try_with
-      ~run:
-        `Schedule
+      ~run:`Schedule
       (fun () -> f t)
     >>= fun result -> Rpc.Connection.close t >>| fun () -> result
   ;;

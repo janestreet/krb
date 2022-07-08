@@ -115,13 +115,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     let serve ~authorize ~principal ~client_addr backend =
       Deferred.Or_error.try_with
-        ~run:
-          `Schedule
+        ~run:`Schedule
         ~here:[%here]
         (fun () -> serve_exn ~authorize ~principal ~peer_addr:client_addr backend)
       >>| function
       | Ok result -> result
-      | Error e -> Error (`Handshake_error e)
+      | Error e ->
+        Error (`Handshake_error (Handshake_error.of_error ~kind:Unexpected_exception e))
     ;;
   end
 end

@@ -63,8 +63,7 @@ let create_writer conn_type auth_context writer =
            `Continue
        in
        Monitor.try_with
-         ~run:
-           `Schedule
+         ~run:`Schedule
          ~name:"Kerberized_rw.create_writer"
          (fun () ->
             Reader.read_one_chunk_at_a_time plaintext_r ~handle_chunk

@@ -119,38 +119,58 @@ let validate_path keytab_path principal_name =
   validate keytab principal
 ;;
 
-(* group keys by kvno and encryption type.  These two ought to be sufficient to determine
-   the key, which is a function of the encryption type and the password "named" by the
-   kvno. *)
+module Stable_group = struct
+  let group (type t) (module Class : Map.Key_plain with type t = t) ~equiv l =
+    let module ClassMap = Map.Make_plain (Class) in
+    let with_class = List.map l ~f:(fun e -> equiv e, e) in
+    let first_occurences =
+      List.foldi with_class ~init:ClassMap.empty ~f:(fun i indexes (_class, _) ->
+        match Map.add ~key:_class ~data:i indexes with
+        | `Ok indexes -> indexes
+        | `Duplicate -> indexes)
+    in
+    List.Assoc.sort_and_group
+      with_class
+      ~compare:
+        (Comparable.lift Int.compare ~f:(fun _class ->
+           Map.find_exn first_occurences _class))
+  ;;
+
+  let%expect_test "stable_group" =
+    let open Deferred.Let_syntax in
+    group (module Int) ~equiv:(fun i -> i % 3) [ 1; 2; 3; 4; 5; 6; 7; 8; 9; 10 ]
+    |> [%sexp_of: (int, int list) List.Assoc.t]
+    |> print_s;
+    [%expect {| ((1 (1 4 7 10)) (2 (2 5 8)) (0 (3 6 9))) |}];
+    return ()
+  ;;
+end
+
 let latest_keys keytab =
-  let%bind entries_by_kvno = entries_by_kvno keytab in
-  let open Deferred.Let_syntax in
-  with_return (fun { return } ->
-    Deferred.Map.mapi entries_by_kvno ~f:(fun ~key:kvno ~data:entries ->
-      Deferred.List.map entries ~f:(fun entry ->
-        Internal.Keytab_entry.keyblock entry
-        >>| ok_exn
-        >>| fun keyblock -> Internal.Keyblock.enctype keyblock, keyblock)
-      >>| Internal.Enctype.Map.of_alist_multi
-      >>| Map.mapi ~f:(fun ~key:enctype ~data:keyblocks ->
-        match
-          List.dedup_and_sort ~compare:[%compare: Internal.Keyblock.t] keyblocks
-        with
-        | [] -> assert false
-        | [ keyblock ] -> keyblock
-        | _ :: _ :: _ as keyblocks ->
-          let keys = List.map ~f:Internal.Keyblock.key keyblocks in
-          return
-          @@ Deferred.return
-          @@ error_s
-               [%message
-                 "conflicting keys"
-                   (kvno : int)
-                   (enctype : Internal.Enctype.t)
-                   (keys : string list)])
-      >>| Map.data)
-    >>| Map.max_elt_exn
-    >>| Result.return)
+  (* For the latest kvno, group keys by and encryption type. This ought to be sufficient to
+     determine the key, which is a function of the encryption type and the password "named"
+     by the latest kvno. *)
+  let%bind latest_kvno, entries =
+    Deferred.Or_error.try_with_join (fun () -> entries_by_kvno keytab >>| Map.max_elt_exn)
+  in
+  let%bind keyblocks =
+    Deferred.Or_error.List.map entries ~f:(fun entry ->
+      Internal.Keytab_entry.keyblock entry)
+    >>| (* We want to preserve the order of the encryption types to keep
+           keytabs easy to inspect.*)
+    Stable_group.group (module Internal.Enctype) ~equiv:Internal.Keyblock.enctype
+    >>= Deferred.Or_error.List.map ~f:(fun (enctype, keyblocks) ->
+      match
+        List.dedup_and_sort ~compare:[%compare: Internal.Keyblock.t] keyblocks
+      with
+      | [] -> assert false
+      | [ keyblock ] -> return keyblock
+      | _ :: _ :: _ ->
+        Deferred.Or_error.error_s
+          [%message
+            "conflicting keys" (latest_kvno : int) (enctype : Internal.Enctype.t)])
+  in
+  return (latest_kvno, keyblocks)
 ;;
 
 let add_spn t spn =
@@ -178,4 +198,57 @@ let add_entry t ~password ~enctype ~kvno ~principal =
   let%bind keyblock = Internal.Keyblock.create enctype ~password ~salt in
   let%bind entry = Internal.Keytab_entry.create principal ~kvno keyblock in
   add_entry t entry
+;;
+
+let update_user_keytab_entries t ~user_entries ~password ~kvno =
+  let open Deferred.Or_error.Let_syntax in
+  Deferred.Or_error.List.iter user_entries ~f:(fun user_entry ->
+    let%bind old_keyblock = Internal.Keytab_entry.keyblock user_entry in
+    let enctype = Internal.Keyblock.enctype old_keyblock in
+    let%bind principal = Internal.Keytab_entry.principal user_entry in
+    add_entry t ~password ~enctype ~kvno ~principal)
+;;
+
+let add_new_entry_for_all_principals ?kvno t ~password =
+  let%bind latest_keytab_kvno, entries = entries_by_kvno t >>| Map.max_elt_exn in
+  let kvno = Option.value kvno ~default:(latest_keytab_kvno + 1) in
+  let%bind principals_and_entries =
+    Deferred.Or_error.List.map entries ~f:(fun entry ->
+      let%map principal_name =
+        Internal.Keytab_entry.principal entry >>| Principal.name
+      in
+      principal_name, entry)
+  in
+  let spns =
+    List.filter_map principals_and_entries ~f:(function principal, _ ->
+      (match principal with
+       | User _ -> None
+       | Service _ -> Some principal))
+    |> List.dedup_and_sort ~compare:[%compare: Principal.Name.t]
+  in
+  let%bind user_entries =
+    match
+      List.filter_map principals_and_entries ~f:(fun (principal, entry) ->
+        match principal with
+        | User _ -> Some (principal, entry)
+        | Service _ -> None)
+      |> List.Assoc.sort_and_group ~compare:[%compare: Principal.Name.t]
+    with
+    | [ (_, entries) ] -> return entries
+    | [] -> Deferred.Or_error.error_s [%message "Missing user principal in keytab."]
+    | entries_and_principals ->
+      let principals = List.map entries_and_principals ~f:fst in
+      Deferred.Or_error.error_s
+        [%message
+          "Multliple user principals in keytab." (principals : Principal.Name.t list)]
+  in
+  let%bind (_ : int * Internal.Keyblock.t list) =
+    (* Ensure that for the latest kvno, all principals have the same keyblock
+       for each encryption type. It's important that we do this before we modify
+       the keytab and bump the kvno! *)
+    latest_keys t
+  in
+  let%bind () = update_user_keytab_entries t ~user_entries ~password ~kvno in
+  let%bind () = Deferred.Or_error.List.iter spns ~f:(fun spn -> add_spn t spn) in
+  return ()
 ;;

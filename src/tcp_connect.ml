@@ -1,24 +1,41 @@
 open! Core
 open! Async
 
-let connect_and_handshake' ~timeout ~connect ~handshake ~on_handshake_error =
+let connect_and_handshake'
+      ?time_source
+      ~timeout
+      ~connect
+      ~handshake
+      ~on_handshake_error
+      ()
+  =
+  let time_source =
+    match time_source with
+    | Some x -> Time_source.read_only x
+    | None -> Time_source.wall_clock ()
+  in
   Deferred.Or_error.try_with_join ~run:`Now ~rest:`Raise (fun () ->
-    let finish_handshake_by = Time.add (Time.now ()) timeout in
-    let%bind connect_ret = connect () in
-    let timeout = Time.diff finish_handshake_by (Time.now ()) in
+    let finish_handshake_by = Time_float.add (Time_float.now ()) timeout in
+    let%bind connect_ret = connect time_source in
+    let timeout = Time_float.diff finish_handshake_by (Time_float.now ()) in
     let result = handshake connect_ret in
     let return_error err =
       let%bind () = on_handshake_error connect_ret in
       Deferred.Or_error.fail
         (Error.tag err ~tag:"The server logs might have more information.")
     in
-    match%bind Clock.with_timeout timeout result with
+    match%bind
+      Time_source.with_timeout
+        time_source
+        (Time_ns.Span.of_span_float_round_nearest timeout)
+        result
+    with
     | `Result (Ok res) -> Deferred.Or_error.return res
     | `Result (Error error) -> return_error error
     | `Timeout ->
       return_error
         (Error.create_s
-           [%message "Timed out doing Krb.Rpc handshake" (timeout : Time.Span.t)]))
+           [%message "Timed out doing Krb.Rpc handshake" (timeout : Time_float.Span.t)]))
 ;;
 
 (* This has to be this way because of the way we handle TCP
@@ -44,20 +61,22 @@ let connect_and_handshake
       ~handshake
   =
   connect_and_handshake'
+    ?time_source
     ~timeout
-    ~connect:(fun () ->
+    ~connect:(fun time_source ->
       Tcp.connect
         ?buffer_age_limit
         ?interrupt
         ?reader_buffer_size
         ?writer_buffer_size
         ~timeout
-        ?time_source
+        ~time_source
         where_to_connect)
     ~handshake:(fun (socket, tcp_reader, tcp_writer) ->
       handshake ~socket ~tcp_reader ~tcp_writer)
     ~on_handshake_error:(fun (_socket, tcp_reader, tcp_writer) ->
       close_connection_via_reader_and_writer tcp_reader tcp_writer)
+    ()
 ;;
 
 let connect_sock_and_handshake
@@ -71,11 +90,13 @@ let connect_sock_and_handshake
   =
   let open Deferred.Or_error.Let_syntax in
   connect_and_handshake'
+    ?time_source
     ~timeout
-    ~connect:(fun () ->
-      Tcp.connect_sock ?interrupt ~timeout ?time_source where_to_connect)
+    ~connect:(fun time_source ->
+      Tcp.connect_sock ?interrupt ~timeout ~time_source where_to_connect)
     ~handshake:(fun socket ->
       let%bind conn = handshake ~socket in
       return (conn, socket))
     ~on_handshake_error:(fun _socket -> Deferred.return ())
+    ()
 ;;

@@ -269,7 +269,7 @@ let get_credentials'
       ~tag
       ~raw:raw_func
       ?(tag_error_with_all_credentials = Config.verbose_errors)
-      ?(ensure_cached_valid_for_at_least = Time.Span.of_min 10.)
+      ?(ensure_cached_valid_for_at_least = Time_float.Span.of_min 10.)
       ~(flags : Krb_flags.Get_credentials.t list)
       t
       ~request
@@ -312,7 +312,7 @@ let get_credentials'
     List.mem flags ~equal:Krb_flags.Get_credentials.equal KRB5_GC_CACHED
   in
   let end_time_is_soon =
-    Time.(
+    Time_float.(
       add (now ()) ensure_cached_valid_for_at_least >= Credentials.endtime credentials)
   in
   if has_cached_flag && end_time_is_soon
@@ -321,7 +321,8 @@ let get_credentials'
     Deferred.Or_error.error_s
       [%message
         ""
-          ~should_be_valid_for_at_least:(ensure_cached_valid_for_at_least : Time.Span.t)
+          ~should_be_valid_for_at_least:
+            (ensure_cached_valid_for_at_least : Time_float.Span.t)
           ~_:(force tag_arguments : Sexp.t)
           ~_:(error : Sexp.t)])
   else Deferred.Or_error.return credentials

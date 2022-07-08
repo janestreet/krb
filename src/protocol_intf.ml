@@ -47,7 +47,8 @@ type 'a with_serve_krb_args =
 
 type 'conn serve_res =
   ( 'conn
-  , [ `Krb_error of Error.t | `Handshake_error of Error.t | `Rejected_client ] )
+  , [ `Krb_error of Error.t | `Handshake_error of Handshake_error.t | `Rejected_client ]
+  )
     Deferred.Result.t
 
 module type S = sig
@@ -75,32 +76,60 @@ module type S = sig
   end
 end
 
+module type Server_header = sig
+  type t [@@deriving bin_io]
+end
+
+module type Client_header = sig
+  type t [@@deriving bin_io]
+end
+
+module type Stable_protocol = sig
+  module Mode : sig
+    type t [@@deriving bin_io]
+  end
+
+  module Server_header : Server_header
+  module Client_header : Client_header
+end
+
 module type Protocol = sig
   module type Connection = Connection
   module type S = S
+  module type Stable_protocol = Stable_protocol
 
   val supported_versions : int list
 
   module Make (Backend : Protocol_backend_intf.S) :
     S with type protocol_backend = Backend.t
 
-  module For_test : sig
-    module Client : sig
-      module V4_header : sig
-        type t [@@deriving bin_io, sexp]
+  module Stable : sig
+    module V1 : Stable_protocol
+    module V2 : Stable_protocol
+    module V3 : Stable_protocol
 
-        val ap_request : t -> Bigstring.Stable.V1.t
-        val accepted_conn_types : t -> Conn_type_preference.t
-      end
-    end
+    module V4 : sig
+      include Stable_protocol
 
-    module Server : sig
-      module V4_header : sig
-        type t [@@deriving bin_io, sexp]
+      module Server_header : sig
+        type t [@@deriving sexp]
 
         val principal : t -> Principal.Name.t
         val accepted_conn_types : t -> Conn_type_preference.t
+
+        include Server_header with type t := t
+      end
+
+      module Client_header : sig
+        type t [@@deriving sexp]
+
+        val ap_request : t -> Bigstring.Stable.V1.t
+        val accepted_conn_types : t -> Conn_type_preference.t
+
+        include Client_header with type t := t
       end
     end
+
+    module V5 : Stable_protocol
   end
 end

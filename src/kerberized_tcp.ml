@@ -8,7 +8,7 @@ type 'a with_krb_args =
 
 type 'a with_connect_args =
   (Socket.Address.Inet.t Tcp.Where_to_connect.t -> 'a) with_krb_args
-    Tcp.with_connect_options
+    Tcp.Aliases.with_connect_options
 
 module Client = struct
   module Internal = struct

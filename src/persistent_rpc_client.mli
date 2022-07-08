@@ -12,7 +12,7 @@ type 'a persistent_connection_args =
   server_name:string
   -> ?log:Log.t
   -> ?on_event:(Host_and_port.t Event.t -> unit Deferred.t)
-  -> ?retry_delay:(unit -> Time.Span.t)
+  -> ?retry_delay:(unit -> Time_float.Span.t)
   -> 'a
 
 val create'

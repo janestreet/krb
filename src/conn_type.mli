@@ -34,20 +34,17 @@ val flag : t list Command.Param.t
 val optional_flag : t list option Command.Param.t
 
 module Stable : sig
-  open Core.Core_stable
-
   module V1 : sig
     type nonrec t = t =
       | Auth
       | Safe
       | Priv
+    [@@deriving bin_io, compare, sexp]
 
     type nonrec comparator_witness = comparator_witness
 
-    include Stable with type t := t with type comparator_witness := comparator_witness
-
     include
-      Comparable.V1.S
+      Comparable.Stable.V1.S
       with type comparable := t
       with type comparator_witness := comparator_witness
   end

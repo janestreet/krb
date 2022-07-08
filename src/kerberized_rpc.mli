@@ -30,7 +30,7 @@ module Transport = Kerberized_rpc_transport
     See [Async.Rpc] for documentation *)
 type 'a async_rpc_args =
   ?max_message_size:int
-  -> ?handshake_timeout:Time.Span.t
+  -> ?handshake_timeout:Time_float.Span.t
   -> ?heartbeat_config:Rpc.Connection.Heartbeat_config.t
   -> 'a
 
@@ -43,7 +43,10 @@ module Connection : sig
     (** [on_kerberos_error] defaults to logging to [Log.Global.error]. See
         [kerberized_tcp.mli] for more details. *)
     -> ?on_handshake_error:
-         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+         [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
+         | `Ignore
+         | `Raise
+         ]
     (** on_handshake_error defaults to [`Ignore]. See [kerberized_tcp.mli] for more
         details. *)
     -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
@@ -101,7 +104,7 @@ module Connection : sig
       (Server_principal.t -> 'conn_state Rpc.Connection.Client_implementations.t)
      -> ?description:Info.t
      -> ?cred_cache:Cred_cache.t (** This defaults to a new MEMORY cache. *)
-     -> ?buffer_age_limit:[ `At_most of Time.Span.t | `Unlimited ]
+     -> ?buffer_age_limit:[ `At_most of Time_float.Span.t | `Unlimited ]
      (** Uses the default value in [Writer.create] if not passed. *)
      -> ?on_credential_forwarding_request:
        (Server_principal.t -> On_credential_forwarding_request.t)

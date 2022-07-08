@@ -18,8 +18,8 @@ module Raw = struct
 end
 
 type t =
-  { tkt_lifetime : Time.Span.t
-  ; renew_lifetime : Time.Span.t
+  { tkt_lifetime : Time_float.Span.t
+  ; renew_lifetime : Time_float.Span.t
   ; forwardable : bool
   ; proxiable : bool
   }
@@ -27,12 +27,12 @@ type t =
 
 let default =
   { tkt_lifetime =
-      Time.Span.of_hr 10.
+      Time_float.Span.of_hr 10.
   (* setting renew_lifetime leads to the KDC issuing renewable tickets. By specifying a
      very long renew_lifetime, we get tickets with the max allowed renew time. By always
      obtaining a renewable TGT, we ensure that all service tickets acquired via that TGT
      are also renewable. *)
-  ; renew_lifetime = Time.Span.of_day 365.
+  ; renew_lifetime = Time_float.Span.of_day 365.
   ; forwardable =
       true
   ; proxiable = false
@@ -55,8 +55,8 @@ let to_raw t =
   Context_sequencer.enqueue_job_with_info ~info ~f:(fun c ->
     Raw.create
       c
-      (Time.Span.to_sec t.tkt_lifetime |> Float.iround_nearest_exn)
-      (Time.Span.to_sec t.renew_lifetime |> Float.iround_nearest_exn)
+      (Time_float.Span.to_sec t.tkt_lifetime |> Float.iround_nearest_exn)
+      (Time_float.Span.to_sec t.renew_lifetime |> Float.iround_nearest_exn)
       t.forwardable
       t.proxiable)
   >>|? fun raw ->

@@ -77,12 +77,12 @@ val ticket_string : t -> string
 
 
 val second_ticket : t -> string
-val starttime : t -> Time.t
+val starttime : t -> Time_float.t
 
 (** valid until this time *)
-val endtime : t -> Time.t
+val endtime : t -> Time_float.t
 
-val renew_until : t -> Time.t
+val renew_until : t -> Time_float.t
 
 (** the session key *)
 val keyblock : t -> Keyblock.t Deferred.Or_error.t

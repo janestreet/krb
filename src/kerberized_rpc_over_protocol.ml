@@ -7,8 +7,7 @@ let collect_errors writer_monitor ~f =
     [ choice (Monitor.detach_and_get_next_error writer_monitor) (fun e -> Error e)
     ; choice
         (try_with
-           ~run:
-             `Schedule
+           ~run:`Schedule
            ~name:"Rpc.Connection.collect_errors"
            f)
         Fn.id

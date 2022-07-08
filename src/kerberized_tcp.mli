@@ -12,7 +12,7 @@ type 'a with_krb_args =
 
 type 'a with_connect_args =
   (Socket.Address.Inet.t Tcp.Where_to_connect.t -> 'a) with_krb_args
-    Tcp.with_connect_options
+    Tcp.Aliases.with_connect_options
 
 val connect : (Kerberized_rw.t * Server_principal.t) Deferred.Or_error.t with_connect_args
 
@@ -43,7 +43,10 @@ module Server : sig
            during the setup phase, invalid service tickets sent by the client, etc. It
            defaults to logging via [Log.Global.error]. *)
        -> ?on_handshake_error:
-         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+         [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
+         | `Ignore
+         | `Raise
+         ]
        (** [on_handshake_error] gets called for any non-kerberos related errors that occur
            during setup of a connection. This includes connectivity errors and version
            negotiation errors (which includes kerberos mode mismatch between client and
@@ -83,7 +86,7 @@ module Internal : sig
        -> krb_mode:Mode.Client.t
        -> Socket.Address.Inet.t Tcp.Where_to_connect.t
        -> Async_protocol.Connection.t Deferred.Or_error.t)
-        Tcp.with_connect_options
+        Tcp.Aliases.with_connect_options
 
   module Endpoint : sig
     val create
@@ -103,7 +106,10 @@ module Internal : sig
       ?on_kerberos_error:
         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
       -> ?on_handshake_error:
-           [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+           [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
+           | `Ignore
+           | `Raise
+           ]
       -> ?on_handler_error:
            [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
       -> authorize:'authorize

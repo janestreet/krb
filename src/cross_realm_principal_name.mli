@@ -47,6 +47,12 @@ val of_string_exn : string -> t
 val realm : t -> Realm.t
 
 module Stable : sig
-  module V1 :
-    Stable_comparable.V1 with type t = t and type comparator_witness = comparator_witness
+  module V1 : sig
+    type nonrec t = t [@@deriving bin_io, compare, sexp]
+
+    include
+      Comparable.Stable.V1.S
+      with type comparable := t
+      with type comparator_witness := comparator_witness
+  end
 end

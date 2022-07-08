@@ -61,14 +61,14 @@ val store_if_not_in_cache
     Default: 10min. *)
 val get_credentials
   :  ?tag_error_with_all_credentials:bool
-  -> ?ensure_cached_valid_for_at_least:Time.Span.t
+  -> ?ensure_cached_valid_for_at_least:Time_float.Span.t
   -> flags:Krb_flags.Get_credentials.t list
   -> t
   -> request:Credentials.t
   -> Credentials.t Deferred.Or_error.t
 
 val get_cached_tgt
-  :  ?ensure_valid_for_at_least:Time.Span.t
+  :  ?ensure_valid_for_at_least:Time_float.Span.t
   -> t
   -> Credentials.t Deferred.Or_error.t
 
@@ -88,7 +88,7 @@ module Expert : sig
       client. The client may be any existing principal. *)
   val get_credentials_for_user
     :  ?tag_error_with_all_credentials:bool
-    -> ?ensure_cached_valid_for_at_least:Time.Span.t
+    -> ?ensure_cached_valid_for_at_least:Time_float.Span.t
     -> flags:Krb_flags.Get_credentials.t list
     -> t
     -> request:Credentials.t

@@ -1,5 +1,6 @@
 module Stable = struct
   open! Core.Core_stable
+  module Conn_type = Conn_type.Stable
   module Conn_type_preference = Conn_type_preference.Stable
 
   module Header = struct
@@ -10,9 +11,89 @@ module Stable = struct
     end
   end
 
-  module V4 = struct
+  module V1 = struct
     module Mode = struct
       type t =
+        | Service
+        | User_to_user of string
+      [@@deriving bin_io, sexp]
+    end
+
+    module Server_header = struct
+      type t =
+        { accepted_conn_types : Conn_type.V1.t list
+        ; principal : string
+        ; endpoint : Mode.t
+        }
+      [@@deriving bin_io, fields]
+    end
+
+    module Client_header = struct
+      type t =
+        { accepted_conn_types : Conn_type.V1.t list
+        ; ap_request : Krb_internal_public.Auth_context.Ap_req.t
+        }
+      [@@deriving bin_io, fields]
+    end
+  end
+
+  module V2 = struct
+    module Mode = struct
+      type t = V1.Mode.t =
+        | Service
+        | User_to_user of string
+      [@@deriving bin_io, sexp]
+    end
+
+    module Server_header = struct
+      type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; principal : Principal.Stable.Name.V1.t
+        ; endpoint : Mode.t
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+
+    module Client_header = struct
+      type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; ap_request : Bigstring.V1.t
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+  end
+
+  module V3 = struct
+    module Mode = struct
+      type t = V1.Mode.t =
+        | Service
+        | User_to_user of string
+      [@@deriving bin_io, sexp]
+    end
+
+    module Server_header = struct
+      type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; principal : Principal.Stable.Name.V1.t
+        ; endpoint : Mode.t
+        ; wants_forwarded_creds : bool
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+
+    module Client_header = struct
+      type t =
+        { accepted_conn_types : Conn_type_preference.V1.t
+        ; ap_request : Bigstring.V1.t
+        ; forward_credentials_if_requested : bool
+        }
+      [@@deriving bin_io, fields, sexp]
+    end
+  end
+
+  module V4 = struct
+    module Mode = struct
+      type t = V1.Mode.t =
         | Service
         | User_to_user of string
       [@@deriving bin_io, sexp]
@@ -39,7 +120,7 @@ module Stable = struct
 
   module V5 = struct
     module Mode = struct
-      type t = V4.Mode.t =
+      type t = V1.Mode.t =
         | Service
         | User_to_user of string
       [@@deriving bin_io, sexp]
@@ -75,7 +156,8 @@ module Flags = Internal.Krb_flags
 module Debug = Internal.Debug
 
 let krb_error = Deferred.Result.map_error ~f:(fun e -> `Krb_error e)
-let handshake_error = Deferred.Result.map_error ~f:(fun e -> `Handshake_error e)
+let handshake_error' ~kind error = `Handshake_error (Handshake_error.of_error ~kind error)
+let handshake_error ~kind r = Deferred.Result.map_error r ~f:(handshake_error' ~kind)
 let supported_versions = Stable.Header.V1.versions
 
 module Make (Backend : Protocol_backend_intf.S) = struct
@@ -212,13 +294,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
               ~while_reading:(name : string)
               ~connection:(Backend.info backend : Info.t)]
       in
-      Error (`Handshake_error error)
+      Error (handshake_error' ~kind:Unexpected_or_no_client_bytes error)
     | `Ok res -> Ok res
   ;;
 
   let read_bin_prot ~backend ~name bin_reader =
     match%map read_bin_prot' ~backend ~name bin_reader with
-    | Error (`Handshake_error e) -> Error e
+    | Error (`Handshake_error (_, e)) -> Error e
     | Ok _ as res -> res
   ;;
 
@@ -233,12 +315,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     >>=? fun buf ->
     Or_error.map (Bigstring.read_bin_prot buf bin_reader) ~f:fst
     |> return
-    |> handshake_error
+    |> handshake_error ~kind:Unexpected_or_no_client_bytes
   ;;
 
   let read_field ~conn_type ~auth_context ~backend ~name bin_reader =
     match%map read_field' ~conn_type ~auth_context ~backend ~name bin_reader with
-    | Error (`Krb_error e) | Error (`Handshake_error e) -> Error e
+    | Error (`Krb_error e) | Error (`Handshake_error (_, e)) -> Error e
     | Ok _ as res -> res
   ;;
 
@@ -264,7 +346,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   end
 
   open Stable
-  module Conn_type = Conn_type.Stable
 
   let debug_log_connection_setup ~peer ~conn_type ~user_to_user ~acting_as =
     Debug.log_s (fun () ->
@@ -290,7 +371,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     module Auth_context = Auth_context.V1
 
     module Mode = struct
-      type t =
+      type t = Stable.V1.Mode.t =
         | Service
         | User_to_user of string
       [@@deriving bin_io, sexp]
@@ -303,7 +384,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     module Header = struct
       module Server = struct
-        type t =
+        type t = Stable.V1.Server_header.t =
           { accepted_conn_types : Conn_type.V1.t list
           ; principal : string
           ; endpoint : Mode.t
@@ -315,7 +396,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       end
 
       module Client = struct
-        type t =
+        type t = Stable.V1.Client_header.t =
           { accepted_conn_types : Conn_type.V1.t list
           ; ap_request : Ap_req.t
           }
@@ -366,7 +447,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
             (Header.Client.accepted_conn_types client_header
              |> Unstable.Conn_type.Set.of_list)
         |> return
-        |> handshake_error
+        |> handshake_error ~kind:Incompatible_client
         >>=? fun conn_type ->
         debug_log_connection_setup
           ~peer
@@ -524,7 +605,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
        - Both read the ACK. If this succeeds, the connection is established
     *)
     module Mode = struct
-      type t =
+      type t = Stable.V2.Mode.t =
         | Service
         | User_to_user of string
       [@@deriving bin_io, sexp]
@@ -537,7 +618,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     module Header = struct
       module Server = struct
-        type t =
+        type t = Stable.V2.Server_header.t =
           { accepted_conn_types : Conn_type_preference.V1.t
           ; principal : Principal.Stable.Name.V1.t
           ; endpoint : Mode.t
@@ -549,7 +630,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       end
 
       module Client = struct
-        type t =
+        type t = Stable.V2.Client_header.t =
           { accepted_conn_types : Conn_type_preference.V1.t
           ; ap_request : Bigstring.Stable.V1.t
           }
@@ -593,7 +674,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~us:accepted_conn_types
           ~peer:(Header.Client.accepted_conn_types client_header)
         |> return
-        |> handshake_error
+        |> handshake_error ~kind:Incompatible_client
         >>=? fun conn_type ->
         debug_log_connection_setup
           ~peer
@@ -760,7 +841,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
        - If this all succeeds, the connection is established
     *)
     module Mode = struct
-      type t =
+      type t = Stable.V3.Mode.t =
         | Service
         | User_to_user of string
       [@@deriving bin_io, sexp]
@@ -775,7 +856,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     module Header = struct
       module Server = struct
-        type t =
+        type t = Stable.V3.Server_header.t =
           { accepted_conn_types : Conn_type_preference.V1.t
           ; principal : Principal.Stable.Name.V1.t
           ; endpoint : Mode.t
@@ -788,7 +869,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       end
 
       module Client = struct
-        type t =
+        type t = Stable.V3.Client_header.t =
           { accepted_conn_types : Conn_type_preference.V1.t
           ; ap_request : Bigstring.Stable.V1.t
           ; forward_credentials_if_requested : bool
@@ -842,7 +923,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~us:accepted_conn_types
           ~peer:(Header.Client.accepted_conn_types client_header)
         |> return
-        |> handshake_error
+        |> handshake_error ~kind:Incompatible_client
         >>=? fun conn_type ->
         debug_log_connection_setup
           ~peer
@@ -1156,7 +1237,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~us:accepted_conn_types
           ~peer:(Header.Client.accepted_conn_types client_header)
         |> return
-        |> handshake_error
+        |> handshake_error ~kind:Incompatible_client
         >>=? fun conn_type ->
         debug_log_connection_setup
           ~peer
@@ -1444,7 +1525,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~us:accepted_conn_types
           ~peer:(Header.Client.accepted_conn_types client_header)
         |> return
-        |> handshake_error
+        |> handshake_error ~kind:Incompatible_client
         >>=? fun conn_type ->
         debug_log_connection_setup
           ~peer
@@ -1657,7 +1738,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       not (String.equal my_realm Config.pre_v5_assumed_realm)
     ;;
 
-    let negotiate ?(override_supported_versions = Header.V1.versions) ~backend principal =
+    let negotiate' ?(override_supported_versions = Header.V1.versions) ~backend principal =
       let force_cross_realm_min_version =
         should_force_cross_realm_min_version principal
       in
@@ -1673,7 +1754,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Protocol_version_header.create_exn ~protocol:Krb ~supported_versions
       in
       Backend.write_bin_prot_exn backend Header.V1.bin_writer_t advertised_versions;
-      read_bin_prot ~backend ~name:"Version header" Header.V1.bin_reader_t
+      read_bin_prot' ~backend ~name:"Version header" Header.V1.bin_reader_t
       >>=? fun other_versions ->
       Protocol_version_header.negotiate
         ~allow_legacy_peer:true
@@ -1706,13 +1787,19 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           [%message "Negotiated Kerberos version" ~v:(version : int)]);
         `Versioned version)
       |> return
+      |> handshake_error ~kind:Incompatible_client
+    ;;
+
+    let negotiate ?override_supported_versions ~backend principal =
+      match%map negotiate' ?override_supported_versions ~backend principal with
+      | Error (`Handshake_error (_, e)) -> Error e
+      | Ok _ as res -> res
     ;;
   end
 
   module Server = struct
     let handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend =
-      Negotiate.negotiate ~backend principal
-      |> handshake_error
+      Negotiate.negotiate' ~backend principal
       >>=? function
       | `Versioned 1 ->
         V1.Server.setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
@@ -1739,18 +1826,17 @@ module Make (Backend : Protocol_backend_intf.S) = struct
                 (version : int)
                 ~i_understand:(Header.V1.versions : int list)]
         in
-        return (Error (`Handshake_error e))
+        return (Error (handshake_error' ~kind:Incompatible_client e))
     ;;
 
     let handshake ~authorize ~accepted_conn_types ~principal ~peer endpoint backend =
       Deferred.Or_error.try_with
-        ~run:
-          `Schedule
+        ~run:`Schedule
         ~here:[%here]
         (fun () ->
            handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend)
       >>| function
-      | Error e -> Error (`Handshake_error e)
+      | Error e -> Error (handshake_error' ~kind:Unexpected_exception e)
       | Ok (_ as result) -> result
     ;;
   end
@@ -1810,15 +1896,5 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~peer
           backend)
     ;;
-  end
-end
-
-module For_test = struct
-  module Client = struct
-    module V4_header = Stable.V4.Client_header
-  end
-
-  module Server = struct
-    module V4_header = Stable.V4.Server_header
   end
 end

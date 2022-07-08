@@ -66,15 +66,20 @@ module Server : sig
     :  ?on_kerberos_error:
       [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
     -> ?on_handshake_error:
-         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+         [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
+         | `Ignore
+         | `Raise
+         ]
     -> ?on_handler_error:
          [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
     -> (Socket.Address.Inet.t -> 'conn -> unit Deferred.t)
     -> (peer:Socket.Address.Inet.t
         -> 'backend
         -> ( 'conn
-           , [ `Handshake_error of Error.t | `Krb_error of Error.t | `Rejected_client ]
-           )
+           , [ `Handshake_error of Handshake_error.t
+             | `Krb_error of Error.t
+             | `Rejected_client
+             ] )
              Deferred.Result.t)
     -> Socket.Address.Inet.t
     -> 'backend Or_error.t
@@ -89,8 +94,10 @@ module Server : sig
     -> (peer:Socket.Address.Inet.t
         -> 'backend
         -> ( 'conn
-           , [ `Handshake_error of Error.t | `Krb_error of Error.t | `Rejected_client ]
-           )
+           , [ `Handshake_error of Handshake_error.t
+             | `Krb_error of Error.t
+             | `Rejected_client
+             ] )
              Deferred.Result.t)
          Deferred.Or_error.t
 
@@ -111,8 +118,10 @@ module Server : sig
     -> (peer:Socket.Address.Inet.t
         -> 'backend
         -> ( [ `Anon | `Krb of 'conn ]
-           , [ `Handshake_error of Error.t | `Krb_error of Error.t | `Rejected_client ]
-           )
+           , [ `Handshake_error of Handshake_error.t
+             | `Krb_error of Error.t
+             | `Rejected_client
+             ] )
              Deferred.Result.t)
          Deferred.Or_error.t
 end

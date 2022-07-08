@@ -9,11 +9,17 @@ module Tcp : sig
     | `Raise
     ]
 
+  type on_handshake_error :=
+    [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
+    | `Ignore
+    | `Raise
+    ]
+
   (** refer to [Kerberized_tcp] and [Kerberized_rpc] for details on these arguments. *)
   val serve
     :  ?max_message_size:int
     -> (?on_kerberos_error:on_error
-        -> ?on_handshake_error:on_error
+        -> ?on_handshake_error:on_handshake_error
         -> ?on_handler_error:on_error
         -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
         -> authorize:Authorize.t
@@ -30,7 +36,7 @@ module Tcp : sig
   val serve_with_anon
     :  ?max_message_size:int
     -> (?on_kerberos_error:on_error
-        -> ?on_handshake_error:on_error
+        -> ?on_handshake_error:on_handshake_error
         -> ?on_handler_error:on_error
         -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
         -> authorize:Authorize.Anon.t
@@ -47,7 +53,7 @@ module Tcp : sig
   val create_handler
     :  ?max_message_size:int
     -> ?on_kerberos_error:on_error
-    -> ?on_handshake_error:on_error
+    -> ?on_handshake_error:on_handshake_error
     -> ?on_handler_error:on_error
     -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
     -> authorize:Authorize.t

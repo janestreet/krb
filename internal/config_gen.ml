@@ -2,6 +2,20 @@ open! Core
 include Config_gen_intf
 
 module Shared = struct
+  module Format = struct
+    type t =
+      { pre_v5_assumed_realm : string option [@sexp.option]
+      ; host_keytab_path : string option [@sexp.option]
+      ; user_keytab_dir_template : string option [@sexp.option]
+      ; default_domain : string option option [@sexp.option]
+      ; debug_log_config : Debug_log_config.Stable.V1.t option [@sexp.option]
+      ; verbose_errors : bool option [@sexp.option]
+      ; sandboxing_state : [ `None | `Sandboxed | `Exempted ] option [@sexp.option]
+      ; am_sandboxed : bool option [@sexp.option]
+      }
+    [@@sexp.allow_extra_fields] [@@deriving of_sexp]
+  end
+
   type t =
     { pre_v5_assumed_realm : string option [@sexp.option]
     ; host_keytab_path : string option [@sexp.option]
@@ -9,12 +23,60 @@ module Shared = struct
     ; default_domain : string option option [@sexp.option]
     ; debug_log_config : Debug_log_config.Stable.V1.t option [@sexp.option]
     ; verbose_errors : bool option [@sexp.option]
-    ; am_sandboxed : bool option [@sexp.option]
+    ; sandboxing_state : [ `None | `Sandboxed | `Exempted ] option [@sexp.option]
     }
-  [@@deriving fields, sexp]
+  [@@deriving fields, sexp_of]
+
+  let t_of_sexp sexp =
+    let { Format.pre_v5_assumed_realm
+        ; host_keytab_path
+        ; user_keytab_dir_template
+        ; default_domain
+        ; debug_log_config
+        ; verbose_errors
+        ; sandboxing_state
+        ; am_sandboxed
+        }
+      =
+      Format.t_of_sexp sexp
+    in
+    let sandboxing_state =
+      match am_sandboxed, sandboxing_state with
+      | Some _, Some _ ->
+        raise_s [%message "cannot specify both [am_sandboxed] and [sandboxing_state]"]
+      | None, None -> None
+      | Some am_sandboxed, None -> Some (if am_sandboxed then `Sandboxed else `None)
+      | None, Some sandboxing_state -> Some sandboxing_state
+    in
+    { pre_v5_assumed_realm
+    ; host_keytab_path
+    ; user_keytab_dir_template
+    ; default_domain
+    ; debug_log_config
+    ; verbose_errors
+    ; sandboxing_state
+    }
+  ;;
 
   let environment_variable = "OCAML_KRB_CONFIG"
   let username_template = "%{username}"
+
+  let%expect_test "parsing" =
+    let test str =
+      let sexp = Sexp.of_string str in
+      match t_of_sexp sexp with
+      | t -> sexp_of_t t |> print_s
+      | exception exn -> print_s [%sexp (exn : Exn.t)]
+    in
+    test "((am_sandboxed true))";
+    [%expect {| ((sandboxing_state Sandboxed)) |}];
+    test "((am_sandboxed false))";
+    [%expect {| ((sandboxing_state None)) |}];
+    test "((sandboxing_state Exempted))";
+    [%expect {| ((sandboxing_state Exempted)) |}];
+    test "((sandboxing_state Exempted) (am_sandboxed true))";
+    [%expect {| "cannot specify both [am_sandboxed] and [sandboxing_state]" |}]
+  ;;
 end
 
 include Shared
@@ -89,7 +151,7 @@ let make ~default ~help_message =
           ~verbose_errors:
             (field [%sexp_of: bool] [ "\n  Whether error messages should be verbose.\n" ])
           (* Purposefully undocumented; this should only be set by the kerberos sandbox. *)
-          ~am_sandboxed:(fun acc _ -> acc)
+          ~sandboxing_state:(fun acc _ -> acc)
       in
       String.concat
         (List.map
@@ -182,8 +244,20 @@ let make ~default ~help_message =
     let default_domain = get_with_default Fields.default_domain
     let debug_log_config = get_with_default Fields.debug_log_config
     let verbose_errors = get_with_default Fields.verbose_errors
-    let am_sandboxed = get_with_default Fields.am_sandboxed
+    let sandboxing_state = get_with_default Fields.sandboxing_state
     let print_debug_messages = List.length debug_log_config > 0
+
+    let am_sandboxed =
+      match sandboxing_state with
+      | `Sandboxed -> true
+      | `None | `Exempted -> false
+    ;;
+
+    let am_exempt_from_sandbox =
+      match sandboxing_state with
+      | `Exempted -> true
+      | `None | `Sandboxed -> false
+    ;;
 
     let t =
       { pre_v5_assumed_realm = Some pre_v5_assumed_realm
@@ -192,7 +266,7 @@ let make ~default ~help_message =
       ; default_domain = Some default_domain
       ; debug_log_config = Some debug_log_config
       ; verbose_errors = Some verbose_errors
-      ; am_sandboxed = Some am_sandboxed
+      ; sandboxing_state = Some sandboxing_state
       }
     ;;
   end : S)

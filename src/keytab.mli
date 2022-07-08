@@ -57,7 +57,6 @@ val entries_for_principal
   -> Principal.t
   -> Internal.Keytab_entry.t list Deferred.Or_error.t
 
-val latest_keys : t -> (int * Internal.Keyblock.t list) Deferred.Or_error.t
 val add_spn : t -> Principal.Name.t -> unit Deferred.Or_error.t
 val remove_spn : t -> Principal.Name.t -> unit Deferred.Or_error.t
 
@@ -67,6 +66,17 @@ val add_entry
   -> enctype:Internal.Enctype.t
   -> kvno:int
   -> principal:Principal.t
+  -> unit Deferred.Or_error.t
+
+(** For each principal and enctype in the keytab, add a fresh key generated from the
+    provided password.
+    - There must not be principals with conflicting keys with the latest kvno.
+    - If no kvno is provided, uses value one greater than the latest kvno found in the
+      keytab. *)
+val add_new_entry_for_all_principals
+  :  ?kvno:int
+  -> t
+  -> password:string
   -> unit Deferred.Or_error.t
 
 module Stable : sig

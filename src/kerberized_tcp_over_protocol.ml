@@ -249,8 +249,14 @@ module Server = struct
     | Error e -> return (handle_on_error ~monitor on_kerberos_error peer e)
     | Ok (Error (`Krb_error e)) ->
       return (handle_on_error ~monitor on_kerberos_error peer e)
-    | Ok (Error (`Handshake_error e)) ->
-      return (handle_on_error ~monitor on_handshake_error peer e)
+    | Ok (Error (`Handshake_error (kind, e))) ->
+      let handle =
+        match on_handshake_error with
+        | `Ignore -> `Ignore
+        | `Raise -> `Raise
+        | `Call f -> `Call (f kind)
+      in
+      return (handle_on_error ~monitor handle peer e)
     | Ok (Error `Rejected_client) ->
       (* This can be logged in the servers [authorize] *)
       return ()
@@ -320,8 +326,11 @@ module Server = struct
         return
           (Error
              (`Handshake_error
-                (Error.of_string
-                   "Not enough data written by the client to determine if it's kerberized")))
+                (Handshake_error.of_error
+                   ~kind:Unexpected_or_no_client_bytes
+                   (Error.of_string
+                      "Not enough data written by the client to determine if it's \
+                       kerberized"))))
       | `Ok (Some Protocol_version_header.Known_protocol.Krb) | `Ok (Some Krb_test_mode)
         -> krb_server_protocol ~peer backend >>|? fun conn -> `Krb conn
       (* [None] is assumed to be an async rpc client here so that async rpc clients

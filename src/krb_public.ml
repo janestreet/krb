@@ -17,6 +17,7 @@ module Conn_type_preference = Conn_type_preference
 module Cred_cache = Cred_cache
 module Cross_realm_principal_name = Cross_realm_principal_name
 module Fqdn = Fqdn
+module Handshake_error = Handshake_error
 module Internal = Internal
 module Kerberized_rw = Kerberized_rw
 module Server_key_source = Server_key_source

@@ -8,8 +8,9 @@ open Async
 type t
 
 val create
-  :  ?tkt_lifetime:Time.Span.t (** default: 10h *)
-  -> ?renew_lifetime:Time.Span.t (** default: 365d (but most likely shortened by KDC) *)
+  :  ?tkt_lifetime:Time_float.Span.t (** default: 10h *)
+  -> ?renew_lifetime:Time_float.Span.t
+  (** default: 365d (but most likely shortened by KDC) *)
   -> ?forwardable:bool (** default: true *)
   -> ?proxiable:bool (** default: false *)
   -> unit

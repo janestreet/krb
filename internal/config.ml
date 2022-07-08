@@ -7,7 +7,7 @@ let default =
   ; default_domain = None
   ; debug_log_config = None
   ; verbose_errors = None
-  ; am_sandboxed = None
+  ; sandboxing_state = None
   }
 ;;
 

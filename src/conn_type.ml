@@ -8,16 +8,12 @@ module Stable = struct
         | Safe
         | Priv
       [@@deriving bin_io, compare, sexp]
+
+      include (val Comparator.V1.make ~compare ~sexp_of_t)
     end
 
-    module C = Comparator.V1.Make (T)
     include T
-    include C
-
-    include Comparable.V1.Make (struct
-        include T
-        include C
-      end)
+    include Comparable.V1.Make (T)
   end
 end
 

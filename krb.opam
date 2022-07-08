@@ -30,3 +30,7 @@ Jane Street's library for Kerberizing RPC connections so that
     every incoming connection, and
   - RPC communication may be encrypted, if necessary.
 "
+depexts: [
+  ["libkrb5-dev"] {os-family = "debian"}
+  ["krb5-devel"] {os-family = "fedora" | os-family = "suse"}
+]

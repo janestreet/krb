@@ -1,6 +1,6 @@
 open! Core
 open Async
-module Time = Time_unix
+module Time = Time_float_unix
 
 module Raw = struct
   type t
