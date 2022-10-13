@@ -25,8 +25,7 @@ module Krb = struct
   ;;
 
   let accept_multiple allowed =
-    Single_realm
-      (fun _ principal -> bool_to_auth (Principal.Name.Set.mem allowed principal))
+    Single_realm (fun _ principal -> bool_to_auth (Set.mem allowed principal))
   ;;
 
   module Cross_realm = struct
@@ -39,9 +38,7 @@ module Krb = struct
     ;;
 
     let accept_multiple allowed =
-      Cross_realm
-        (fun _ principal ->
-           bool_to_auth (Cross_realm_principal_name.Set.mem allowed principal))
+      Cross_realm (fun _ principal -> bool_to_auth (Set.mem allowed principal))
     ;;
   end
 end
@@ -63,7 +60,7 @@ module Anon = struct
   ;;
 
   let accept_multiple allowed =
-    of_krb (fun _ principal -> bool_to_auth (Principal.Name.Set.mem allowed principal))
+    of_krb (fun _ principal -> bool_to_auth (Set.mem allowed principal))
   ;;
 end
 

@@ -43,10 +43,10 @@ let strength = function
   | Priv -> 2
 ;;
 
-let strongest = Set.max_elt
+let strongest = Core.Set.max_elt
 
 let negotiate_strongest ~us ~peer =
-  Set.inter us peer
+  Core.Set.inter us peer
   |> strongest
   |> function
   | Some t -> Ok t

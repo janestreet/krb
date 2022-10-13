@@ -12,12 +12,14 @@ module Reader = struct
     { reader : Reader.t
     ; decode : Bigsubstring.t -> Bigstring.t Deferred.Or_error.t
     ; max_message_size : int
+    ; mutable bytes_read : Int63.t
     }
   [@@deriving fields, sexp_of]
 
   let with_reader f t = f t.reader
   let close = with_reader Reader.close
   let is_closed = with_reader Reader.is_closed
+  let bytes_read t = t.bytes_read
 
   let check_message_size t ~payload_length =
     if not (message_size_ok ~max_message_size:t.max_message_size ~payload_length)
@@ -51,6 +53,7 @@ module Reader = struct
         else (
           let consumed = consumed + total_len in
           let%bind (result : _ Transport.Handler_result.t) =
+            t.bytes_read <- Int63.(t.bytes_read + of_int payload_len);
             let%map payload =
               Bigsubstring.create
                 buf
@@ -158,6 +161,7 @@ module Writer = struct
     ; close_started : unit Ivar.t
     ; pending_writes : Pending_writes.t
     ; on_done_with_internal_buffer : Bigstring.t -> unit
+    ; mutable bytes_written : Int63.t
     }
   [@@deriving fields, sexp_of]
 
@@ -182,6 +186,7 @@ module Writer = struct
       ~close_started
       ~pending_writes
       ~on_done_with_internal_buffer
+      ~bytes_written:Int63.zero
   ;;
 
   let monitor t = Writer.monitor t.writer
@@ -189,6 +194,7 @@ module Writer = struct
   (* [bytes_to_write] might not be exactly correct because it doesn't take pending writes
      into account *)
   let bytes_to_write t = Writer.bytes_to_write t.writer
+  let bytes_written t = t.bytes_written
   let is_closed t = Ivar.is_full t.close_started || Writer.is_closed t.writer
 
   let close t =
@@ -232,6 +238,7 @@ module Writer = struct
       if Writer.can_write t.writer
       then (
         let payload_length = Bigstring.length encoded_payload in
+        t.bytes_written <- Int63.(t.bytes_written + of_int payload_length);
         Writer.write_bin_prot_no_size_header
           t.writer
           ~size:Transport.Header.length
@@ -342,7 +349,7 @@ let of_connection
            let reader =
              Async_rpc_kernel.Rpc.Transport.Reader.pack
                (module Reader)
-               { reader; decode; max_message_size }
+               { reader; decode; max_message_size; bytes_read = Int63.zero }
            in
            let writer =
              Async_rpc_kernel.Rpc.Transport.Writer.pack

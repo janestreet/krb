@@ -47,7 +47,7 @@ let to_set = function
 let filter_against_peer lst ~peer =
   let mem =
     match peer with
-    | Any a -> Conn_type.Set.mem a
+    | Any a -> Set.mem a
     | Prefer p -> List.mem p ~equal:Conn_type.equal
   in
   List.filter lst ~f:mem
@@ -57,7 +57,7 @@ let filter pref ~only_in =
   match pref with
   | Any conn_types ->
     Any
-      (Conn_type_set.to_list conn_types
+      (Set.to_list conn_types
        |> filter_against_peer ~peer:only_in
        |> Conn_type_set.of_list)
   | Prefer conn_types -> Prefer (filter_against_peer conn_types ~peer:only_in)
