@@ -24,6 +24,10 @@ type t
 
 val create : (Socket.Address.Inet.t -> Principal.Name.t -> [ `Accept | `Reject ]) -> t
 
+val create_async
+  :  (Socket.Address.Inet.t -> Principal.Name.t -> [ `Accept | `Reject ] Deferred.t)
+  -> t
+
 (**
    The following helper functions should aid in the common case of validating
    the client or server principals.
@@ -60,13 +64,14 @@ module Anon : sig
 end
 
 val krb_of_anon : Anon.t -> t
+val authorization_method : t -> [ `Accept_all | `Custom ]
 
 module For_internal_use : sig
   val authorize
     :  t
     -> Socket.Address.Inet.t
     -> Cross_realm_principal_name.t
-    -> [ `Accept | `Reject ]
+    -> [ `Accept | `Reject ] Deferred.t
 
   val allows_cross_realm : t -> bool
 
@@ -75,6 +80,6 @@ module For_internal_use : sig
       :  Anon.t
       -> Socket.Address.Inet.t
       -> Principal.Name.t option
-      -> [ `Accept | `Reject ]
+      -> [ `Accept | `Reject ] Deferred.t
   end
 end

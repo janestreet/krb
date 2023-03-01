@@ -154,22 +154,85 @@ module Server = struct
         |> Deferred.ok)
     ;;
 
-    let krb_server_protocol ~authorize krb_mode =
+    let krb_server_protocol
+          ?override_supported_versions
+          ?additional_magic_numbers
+          ~authorize
+          krb_mode
+      =
       Kerberized_tcp_over_protocol.Server.krb_server_protocol
         (module Async_protocol)
+        ?override_supported_versions
+        ?additional_magic_numbers
         ~authorize
         krb_mode
     ;;
 
+    module Krb_or_anon_conn = struct
+      type t =
+        | Krb of Async_protocol.Connection.t
+        | Anon of (Reader.t * Writer.t)
+    end
+
+    let krb_or_anon_server_protocol ?override_supported_versions ~authorize krb_mode =
+      Kerberized_tcp_over_protocol.Server.krb_or_anon_server_protocol
+        (module Protocol_backend_async)
+        (module Async_protocol)
+        ?override_supported_versions
+        ~peek_protocol_version_header:(fun backend ->
+          Protocol_backend_async.peek_bin_prot
+            backend
+            Protocol_version_header.any_magic_prefix)
+        ~authorize
+        krb_mode
+      >>|? fun server_protocol ->
+      let server_protocol ~peer backend =
+        match%bind server_protocol ~peer backend with
+        | Error error -> Deferred.Result.fail error
+        | Ok (`Krb conn) -> Deferred.Result.return (Krb_or_anon_conn.Krb conn)
+        | Ok `Anon ->
+          Deferred.Result.return
+            (Krb_or_anon_conn.Anon
+               ( Protocol_backend_async.reader backend
+               , Protocol_backend_async.writer backend ))
+      in
+      server_protocol
+    ;;
+
     let create_handler
+          ?additional_magic_numbers
           ?on_kerberos_error
           ?on_handshake_error
           ?on_handler_error
+          ?override_supported_versions
           ~authorize
           ~krb_mode
           handle_client
       =
-      krb_server_protocol ~authorize krb_mode
+      krb_server_protocol
+        ?override_supported_versions
+        ?additional_magic_numbers
+        ~authorize
+        krb_mode
+      >>|? fun server_protocol ->
+      handler_from_server_protocol
+        ?on_kerberos_error
+        ?on_handshake_error
+        ?on_handler_error
+        handle_client
+        server_protocol
+    ;;
+
+    let create_handler_with_anon
+          ?on_kerberos_error
+          ?on_handshake_error
+          ?on_handler_error
+          ?override_supported_versions
+          ~authorize
+          ~krb_mode
+          handle_client
+      =
+      krb_or_anon_server_protocol ?override_supported_versions ~authorize krb_mode
       >>|? fun server_protocol ->
       handler_from_server_protocol
         ?on_kerberos_error
@@ -180,6 +243,7 @@ module Server = struct
     ;;
 
     let create
+          ?additional_magic_numbers
           ?max_connections
           ?backlog
           ?drop_incoming_connections
@@ -187,6 +251,7 @@ module Server = struct
           ?on_kerberos_error
           ?on_handshake_error
           ?on_handler_error
+          ?override_supported_versions
           ~authorize
           ~krb_mode
           where_to_listen
@@ -197,7 +262,11 @@ module Server = struct
           "Starting Kerberized server"
             (where_to_listen : Tcp.Where_to_listen.inet)
             (krb_mode : Mode.Server.t)]);
-      krb_server_protocol ~authorize krb_mode
+      krb_server_protocol
+        ?override_supported_versions
+        ?additional_magic_numbers
+        ~authorize
+        krb_mode
       >>=? fun server_protocol ->
       create_from_server_protocol
         ?max_connections
@@ -212,12 +281,6 @@ module Server = struct
         server_protocol
     ;;
 
-    module Krb_or_anon_conn = struct
-      type t =
-        | Krb of Async_protocol.Connection.t
-        | Anon of (Reader.t * Writer.t)
-    end
-
     let create_with_anon
           ?max_connections
           ?backlog
@@ -226,31 +289,14 @@ module Server = struct
           ?on_kerberos_error
           ?on_handshake_error
           ?on_handler_error
+          ?override_supported_versions
           ~authorize
           ~krb_mode
           where_to_listen
           handle_client
       =
-      Kerberized_tcp_over_protocol.Server.krb_or_anon_server_protocol
-        (module Protocol_backend_async)
-        (module Async_protocol)
-        ~peek_protocol_version_header:(fun backend ->
-          Protocol_backend_async.peek_bin_prot
-            backend
-            Protocol_version_header.any_magic_prefix)
-        ~authorize
-        krb_mode
+      krb_or_anon_server_protocol ?override_supported_versions ~authorize krb_mode
       >>=? fun server_protocol ->
-      let server_protocol ~peer backend =
-        match%bind server_protocol ~peer backend with
-        | Error error -> Deferred.Result.fail error
-        | Ok (`Krb conn) -> Deferred.Result.return (Krb_or_anon_conn.Krb conn)
-        | Ok `Anon ->
-          Deferred.Result.return
-            (Krb_or_anon_conn.Anon
-               ( Protocol_backend_async.reader backend
-               , Protocol_backend_async.writer backend ))
-      in
       create_from_server_protocol
         ?max_connections
         ?backlog
@@ -273,6 +319,7 @@ module Server = struct
         ?on_kerberos_error
         ?on_handshake_error
         ?on_handler_error
+        ?override_supported_versions
         ~authorize
         ~krb_mode
         where_to_listen
@@ -286,6 +333,7 @@ module Server = struct
       ?on_kerberos_error
       ?on_handshake_error
       ?on_handler_error
+      ?override_supported_versions
       ~authorize
       ~krb_mode
       where_to_listen

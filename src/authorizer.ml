@@ -1,4 +1,5 @@
 open! Core
+open! Async
 
 module Acting_as = struct
   type t =
@@ -30,7 +31,7 @@ let run_sided ~(acting_as : Acting_as.t) ~peer_principal ~peer_address f =
     | Server -> "server", "client"
     | Client -> "client", "server"
   in
-  match f () with
+  match%map f () with
   | `Accept -> Ok ()
   | `Reject with_error ->
     (match with_error with
@@ -62,12 +63,13 @@ let run
       ~peer_principal
   =
   let run_sided = run_sided ~acting_as ~peer_address ~peer_principal in
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%bind () =
-    run_sided (fun () -> validate_cross_realm ~authorize ~my_principal ~peer_principal)
+    run_sided (fun () ->
+      validate_cross_realm ~authorize ~my_principal ~peer_principal |> Deferred.return)
   in
-  Or_error.try_with_join (fun () ->
+  Deferred.Or_error.try_with_join (fun () ->
     run_sided (fun () ->
       Authorize.For_internal_use.authorize authorize peer_address peer_principal
-      |> lift_error))
+      |> Deferred.map ~f:lift_error))
 ;;

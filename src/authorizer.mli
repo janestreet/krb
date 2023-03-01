@@ -14,4 +14,4 @@ val run
   -> my_principal:Cross_realm_principal_name.t
   -> peer_address:Socket.Address.Inet.t
   -> peer_principal:Cross_realm_principal_name.t
-  -> unit Or_error.t
+  -> unit Deferred.Or_error.t

@@ -397,7 +397,18 @@ module Tcp = struct
       | Ok transport -> handle_client addr transport connection)
   ;;
 
-  let serve
+  let handle_rpc_client ?max_message_size handle_client =
+    Staged.stage (fun addr (reader, writer) ->
+      let max_message_size =
+        Option.value max_message_size ~default:(force default_max_message_size)
+      in
+      let transport = Rpc.Transport.of_reader_writer ~max_message_size reader writer in
+      handle_client addr transport None)
+  ;;
+
+  let serve_internal
+        ?override_supported_versions
+        ?additional_magic_numbers
         ?max_message_size
         ?max_connections
         ?backlog
@@ -420,6 +431,8 @@ module Tcp = struct
       ?on_kerberos_error
       ?on_handshake_error
       ?on_handler_error
+      ?override_supported_versions
+      ?additional_magic_numbers
       ~authorize
       ~krb_mode
       where_to_listen
@@ -427,7 +440,8 @@ module Tcp = struct
          (handle_krb_client ?max_message_size ?on_done_with_internal_buffer handle_client))
   ;;
 
-  let serve_with_anon
+  let serve_with_anon_internal
+        ?override_supported_versions
         ?max_message_size
         ?max_connections
         ?backlog
@@ -449,14 +463,11 @@ module Tcp = struct
         (fun addr transport connection -> handle_client addr transport (Some connection))
       |> Staged.unstage
     in
-    let handle_rpc_client addr (reader, writer) =
-      let max_message_size =
-        Option.value max_message_size ~default:(force default_max_message_size)
-      in
-      let transport = Rpc.Transport.of_reader_writer ~max_message_size reader writer in
-      handle_client addr transport None
+    let handle_rpc_client =
+      handle_rpc_client ?max_message_size handle_client |> Staged.unstage
     in
     Kerberized_tcp.Internal.Server.create_with_anon
+      ?override_supported_versions
       ?max_connections
       ?backlog
       ?drop_incoming_connections
@@ -473,7 +484,8 @@ module Tcp = struct
          | Anon connection -> handle_rpc_client addr connection)
   ;;
 
-  let create_handler
+  let create_handler_internal
+        ?override_supported_versions
         ?max_message_size
         ?on_kerberos_error
         ?on_handshake_error
@@ -484,6 +496,7 @@ module Tcp = struct
         handle_client
     =
     Kerberized_tcp.Internal.Server.create_handler
+      ?override_supported_versions
       ?on_kerberos_error
       ?on_handshake_error
       ?on_handler_error
@@ -491,6 +504,40 @@ module Tcp = struct
       ~krb_mode
       (handle_krb_client ?max_message_size ?on_done_with_internal_buffer handle_client
        |> Staged.unstage)
+  ;;
+
+  let create_handler_with_anon_internal
+        ?override_supported_versions
+        ?max_message_size
+        ?on_kerberos_error
+        ?on_handshake_error
+        ?on_handler_error
+        ?on_done_with_internal_buffer
+        ~authorize
+        ~krb_mode
+        handle_client
+    =
+    let handle_krb_client =
+      handle_krb_client
+        ?max_message_size
+        ?on_done_with_internal_buffer
+        (fun addr transport connection -> handle_client addr transport (Some connection))
+      |> Staged.unstage
+    in
+    let handle_rpc_client =
+      handle_rpc_client ?max_message_size handle_client |> Staged.unstage
+    in
+    Kerberized_tcp.Internal.Server.create_handler_with_anon
+      ?override_supported_versions
+      ?on_kerberos_error
+      ?on_handshake_error
+      ?on_handler_error
+      ~authorize
+      ~krb_mode
+      (fun addr connection ->
+         match (connection : Kerberized_tcp.Internal.Server.Krb_or_anon_conn.t) with
+         | Krb connection -> handle_krb_client addr connection
+         | Anon connection -> handle_rpc_client addr connection)
   ;;
 
   let client_internal
@@ -527,11 +574,20 @@ module Tcp = struct
       return (Ok (transport, connection))
   ;;
 
+  let serve = serve_internal ?override_supported_versions:None
+  let serve_with_anon = serve_with_anon_internal ?override_supported_versions:None
+  let create_handler = create_handler_internal ?override_supported_versions:None
+
+  let create_handler_with_anon =
+    create_handler_with_anon_internal ?override_supported_versions:None
+  ;;
+
   let client = client_internal ?override_supported_versions:None
 end
 
 module Internal = struct
   module Tcp = struct
+    let serve = Tcp.serve_internal
     let client = Tcp.client_internal
   end
 end

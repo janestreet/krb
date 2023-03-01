@@ -29,7 +29,7 @@ let tags' t code =
 
 let sandbox_tag =
   Option.some_if
-    (am_running_inline_test && not Config.am_sandboxed)
+    (Ppx_inline_test_lib.am_running && not Config.am_sandboxed)
     (Sexp.Atom
        "No KDC access - consider setting (uses_kerberos (Yes_with_principals \
         (PRINCIPALS...))) in the appropriate portion of the jbuild to opt-in to \

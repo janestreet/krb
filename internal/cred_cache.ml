@@ -101,7 +101,7 @@ module Full_name = struct
 
   let sexp_of_t str =
     let str =
-      if am_running_inline_test
+      if Ppx_inline_test_lib.am_running
       then String.take_while str ~f:(fun x -> not (Char.equal x ':'))
       else str
     in

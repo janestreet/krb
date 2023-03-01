@@ -71,7 +71,12 @@ module Connection : sig
       async_rpc_args
 
   (** [serve] starts an RPC server that provides the given [implementations] *)
-  val serve : (Client_identity.t, Authorize.t, 'a) server_args
+  val serve
+    :  ?additional_magic_numbers:int list
+    (** [additional_magic_numbers] adds additional version numbers to be
+        advertised by the server during protocol negotiation, usually in
+        the context of reporting metadata about the server. *)
+    -> (Client_identity.t, Authorize.t, 'a) server_args
 
   (** [serve_with_anon] starts an RPC server that allows connections from both [Krb.Rpc]
       and [Async.Rpc] clients
@@ -83,21 +88,28 @@ module Connection : sig
 
       This will fail to recognize sufficiently old kerberized RPC clients, so changing
       from [serve] to [serve_with_anon] can introduce problems, but such a change should
-      rarely be necessary, if ever.
-  *)
+      rarely be necessary, if ever. *)
   val serve_with_anon : (Client_identity.t option, Authorize.Anon.t, 'a) server_args
+
+  type ('client_identity, 'authorize, 'conn_state) create_client_handler :=
+    ( 'client_identity
+    , 'authorize
+    , 'conn_state
+    , Mode.Server.t
+    -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
+         Deferred.Or_error.t )
+      krb_rpc_args
+      async_rpc_args
 
   (** [create_handler] is the same as [serve], but it provides a handler that can be used
       with an externally created TCP server. *)
-  val create_handler
-    : ( Client_identity.t
-      , Authorize.t
-      , 'conn_state
-      , Mode.Server.t
-        -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
-             Deferred.Or_error.t )
-        krb_rpc_args
-        async_rpc_args
+  val create_handler : (Client_identity.t, Authorize.t, 'conn_state) create_client_handler
+
+  (** [create_handler_with_anon] is like [create_handler] except that it can handle
+      connections from both [Krb.Rpc] and [Async.Rpc] clients. See the doc for
+      [serve_with_anon] for more details. *)
+  val create_handler_with_anon
+    : (Client_identity.t option, Authorize.Anon.t, 'conn_state) create_client_handler
 
   type ('a, 'conn_state) with_client_args :=
     (?implementations:
@@ -136,5 +148,12 @@ module Connection : sig
     val client
       :  ?override_supported_versions:int list
       -> (t Deferred.Or_error.t, _) with_client_args
+
+    val serve
+      :  ?override_supported_versions:int list
+      -> ?additional_magic_numbers:int list
+      (** If used in conjunction with [override_supported_versions], these
+          numbers are added additionally to these specified versions. *)
+      -> (Client_identity.t, Authorize.t, 'a) server_args
   end
 end

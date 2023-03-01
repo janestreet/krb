@@ -6,7 +6,10 @@ module Header = struct
   type t = Protocol_version_header.t [@@deriving bin_io]
 
   let v1 =
-    Protocol_version_header.create_exn ~protocol:Krb_test_mode ~supported_versions:[ 1 ]
+    Protocol_version_header.create_exn
+      ()
+      ~protocol:Krb_test_mode
+      ~supported_versions:[ 1 ]
   ;;
 end
 
@@ -72,14 +75,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     syn_exn ~acting_as backend principal
     >>| Principal.Name.with_realm ~realm
     >>= fun other_principal ->
-    let authorize_result =
-      Authorizer.run
-        ~authorize
-        ~acting_as
-        ~my_principal
-        ~peer_address:peer_addr
-        ~peer_principal:other_principal
-    in
+    Authorizer.run
+      ~authorize
+      ~acting_as
+      ~my_principal
+      ~peer_address:peer_addr
+      ~peer_principal:other_principal
+    >>= fun authorize_result ->
     ack_exn ~acting_as backend authorize_result
     >>|? fun () ->
     let conn =

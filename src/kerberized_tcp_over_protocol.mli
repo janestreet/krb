@@ -85,8 +85,12 @@ module Server : sig
     -> 'backend Or_error.t
     -> unit Deferred.t
 
+  (** [override_supported_versions] and [additional_magic_numbers] would be ignored in
+      [Test_with_principal] mode. *)
   val krb_server_protocol
-    :  (module Protocol_with_test_mode_intf.S
+    :  ?override_supported_versions:int list
+    -> ?additional_magic_numbers:int list
+    -> (module Protocol_with_test_mode_intf.S
          with type protocol_backend = 'backend
           and type Connection.t = 'conn)
     -> authorize:Authorize.t
@@ -102,7 +106,8 @@ module Server : sig
          Deferred.Or_error.t
 
   val krb_or_anon_server_protocol
-    :  (module Protocol_backend_intf.S with type t = 'backend)
+    :  ?override_supported_versions:int list
+    -> (module Protocol_backend_intf.S with type t = 'backend)
     -> (module Protocol_with_test_mode_intf.S
          with type protocol_backend = 'backend
           and type Connection.t = 'conn)

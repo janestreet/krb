@@ -465,14 +465,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         >>=? fun (auth_context, client) ->
         let client_principal_name = Principal.Cross_realm.name client in
         let my_principal = Principal.Cross_realm.name principal in
-        let authorize_result =
-          Authorizer.run
-            ~authorize
-            ~acting_as:Server
-            ~my_principal
-            ~peer_address:peer
-            ~peer_principal:client_principal_name
-        in
+        Authorizer.run
+          ~authorize
+          ~acting_as:Server
+          ~my_principal
+          ~peer_address:peer
+          ~peer_principal:client_principal_name
+        >>= fun authorize_result ->
         write_field'
           ~conn_type
           ~auth_context
@@ -561,7 +560,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~my_principal
           ~peer_address:peer
           ~peer_principal:server_principal_name
-        |> return
         >>=? fun () ->
         setup_client_context ~cred_cache ~backend server_header
         >>=? fun (auth_context, ap_request) ->
@@ -695,14 +693,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.write ~backend ap_rep;
         let my_principal = Principal.Cross_realm.name principal in
         let client_principal_name = Principal.Cross_realm.name client in
-        let authorize_result =
-          Authorizer.run
-            ~authorize
-            ~acting_as:Server
-            ~my_principal
-            ~peer_address:peer
-            ~peer_principal:client_principal_name
-        in
+        Authorizer.run
+          ~authorize
+          ~acting_as:Server
+          ~my_principal
+          ~peer_address:peer
+          ~peer_principal:client_principal_name
+        >>= fun authorize_result ->
         (* These acks are probably not necessary at this point, but it is a good sanity
            check that both the client and server can encrypt/decrypt with the correct
            connection type. *)
@@ -801,7 +798,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~my_principal
           ~peer_address:peer
           ~peer_principal:server_principal_name
-        |> return
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
         >>=? fun () ->
@@ -944,14 +940,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.write ~backend ap_rep;
         let client_principal_name = Principal.Cross_realm.name client in
         let my_principal = Principal.Cross_realm.name principal in
-        let authorize_result =
-          Authorizer.run
-            ~authorize
-            ~acting_as:Server
-            ~peer_address:peer
-            ~peer_principal:client_principal_name
-            ~my_principal
-        in
+        Authorizer.run
+          ~authorize
+          ~acting_as:Server
+          ~peer_address:peer
+          ~peer_principal:client_principal_name
+          ~my_principal
+        >>= fun authorize_result ->
         (* These acks are probably not necessary at this point, but it is a good sanity
            check that both the client and server can encrypt/decrypt with the correct
            connection type. *)
@@ -1104,7 +1099,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~my_principal
           ~peer_address:peer
           ~peer_principal:server_principal_name
-        |> return
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
         >>=? fun () ->
@@ -1280,14 +1274,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.write ~backend ap_rep;
         let my_principal = Principal.Cross_realm.name principal in
         let client_principal_name = Principal.Cross_realm.name client in
-        let authorize_result =
-          Authorizer.run
-            ~authorize
-            ~acting_as:Server
-            ~my_principal
-            ~peer_address:peer
-            ~peer_principal:client_principal_name
-        in
+        Authorizer.run
+          ~authorize
+          ~acting_as:Server
+          ~my_principal
+          ~peer_address:peer
+          ~peer_principal:client_principal_name
+        >>= fun authorize_result ->
         (* These acks are probably not necessary at this point, but it is a good sanity
            check that both the client and server can encrypt/decrypt with the correct
            connection type. *)
@@ -1410,7 +1403,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~my_principal
           ~peer_address:peer
           ~peer_principal:server_principal_name
-        |> return
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
         >>=? fun () ->
@@ -1568,14 +1560,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.write ~backend ap_rep;
         let my_principal = Principal.Cross_realm.name principal in
         let client_principal_name = Principal.Cross_realm.name client in
-        let authorize_result =
-          Authorizer.run
-            ~authorize
-            ~acting_as:Server
-            ~my_principal
-            ~peer_address:peer
-            ~peer_principal:client_principal_name
-        in
+        Authorizer.run
+          ~authorize
+          ~acting_as:Server
+          ~my_principal
+          ~peer_address:peer
+          ~peer_principal:client_principal_name
+        >>= fun authorize_result ->
         (* These acks are probably not necessary at this point, but it is a good sanity
            check that both the client and server can encrypt/decrypt with the correct
            connection type. *)
@@ -1697,7 +1688,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~my_principal
           ~peer_address:peer
           ~peer_principal:server_principal_name
-        |> return
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
         >>=? fun () ->
@@ -1738,7 +1728,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       not (String.equal my_realm Config.pre_v5_assumed_realm)
     ;;
 
-    let negotiate' ?(override_supported_versions = Header.V1.versions) ~backend principal =
+    let negotiate'
+          ?(override_supported_versions = Header.V1.versions)
+          ?additional_magic_numbers
+          ~backend
+          principal
+      =
       let force_cross_realm_min_version =
         should_force_cross_realm_min_version principal
       in
@@ -1751,7 +1746,11 @@ module Make (Backend : Protocol_backend_intf.S) = struct
               override_supported_versions
           else override_supported_versions
         in
-        Protocol_version_header.create_exn ~protocol:Krb ~supported_versions
+        Protocol_version_header.create_exn
+          ?additional_magic_numbers
+          ()
+          ~protocol:Krb
+          ~supported_versions
       in
       Backend.write_bin_prot_exn backend Header.V1.bin_writer_t advertised_versions;
       read_bin_prot' ~backend ~name:"Version header" Header.V1.bin_reader_t
@@ -1769,6 +1768,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
               ~allow_legacy_peer:true
               ~us:
                 (Protocol_version_header.create_exn
+                   ()
                    ~protocol:Krb
                    ~supported_versions:override_supported_versions)
               ~peer:other_versions
@@ -1798,8 +1798,21 @@ module Make (Backend : Protocol_backend_intf.S) = struct
   end
 
   module Server = struct
-    let handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend =
-      Negotiate.negotiate' ~backend principal
+    let handshake_exn
+          ?override_supported_versions
+          ?additional_magic_numbers
+          ~authorize
+          ~accepted_conn_types
+          ~principal
+          ~peer
+          endpoint
+          backend
+      =
+      Negotiate.negotiate'
+        ?override_supported_versions
+        ?additional_magic_numbers
+        ~backend
+        principal
       >>=? function
       | `Versioned 1 ->
         V1.Server.setup ~accepted_conn_types ~authorize ~principal ~peer endpoint backend
@@ -1829,12 +1842,29 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         return (Error (handshake_error' ~kind:Incompatible_client e))
     ;;
 
-    let handshake ~authorize ~accepted_conn_types ~principal ~peer endpoint backend =
+    let handshake
+          ?override_supported_versions
+          ?additional_magic_numbers
+          ~authorize
+          ~accepted_conn_types
+          ~principal
+          ~peer
+          endpoint
+          backend
+      =
       Deferred.Or_error.try_with
         ~run:`Schedule
         ~here:[%here]
         (fun () ->
-           handshake_exn ~authorize ~accepted_conn_types ~principal ~peer endpoint backend)
+           handshake_exn
+             ?override_supported_versions
+             ?additional_magic_numbers
+             ~authorize
+             ~accepted_conn_types
+             ~principal
+             ~peer
+             endpoint
+             backend)
       >>| function
       | Error e -> Error (handshake_error' ~kind:Unexpected_exception e)
       | Ok (_ as result) -> result

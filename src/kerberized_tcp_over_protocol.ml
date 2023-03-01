@@ -268,6 +268,8 @@ module Server = struct
   ;;
 
   let krb_server_protocol
+        ?override_supported_versions
+        ?additional_magic_numbers
         (type backend conn)
         (module Protocol : Protocol_with_test_mode_intf.S
           with type protocol_backend = backend
@@ -285,6 +287,8 @@ module Server = struct
         | Error e -> return (Error (`Krb_error e))
         | Ok endpoint ->
           Protocol.Server.handshake
+            ?override_supported_versions
+            ?additional_magic_numbers
             ~authorize
             ~accepted_conn_types
             ~principal
@@ -301,6 +305,7 @@ module Server = struct
   ;;
 
   let krb_or_anon_server_protocol
+        ?override_supported_versions
         (type backend conn)
         (module _ : Protocol_backend_intf.S with type t = backend)
         (module Protocol : Protocol_with_test_mode_intf.S
@@ -311,7 +316,11 @@ module Server = struct
         krb_mode
     =
     let authorize_mapped = Authorize.krb_of_anon authorize in
-    krb_server_protocol (module Protocol) ~authorize:authorize_mapped krb_mode
+    krb_server_protocol
+      ?override_supported_versions
+      (module Protocol)
+      ~authorize:authorize_mapped
+      krb_mode
     >>=? fun krb_server_protocol ->
     let server_protocol ~peer backend =
       let%bind peek_result =
@@ -338,7 +347,7 @@ module Server = struct
          connect. *)
       | `Ok (Some Rpc) | `Ok None ->
         let ok = Ok `Anon in
-        (match Authorize.For_internal_use.Anon.authorize authorize peer None with
+        (match%bind Authorize.For_internal_use.Anon.authorize authorize peer None with
          | `Accept -> return ok
          | `Reject -> return (Error `Rejected_client))
     in

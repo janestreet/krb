@@ -72,7 +72,7 @@ let initialize_with_creds cred_cache principal all_creds =
     let%bind cred_cache_staging = Internal.Cred_cache.Expert.resolve ("FILE:" ^ src) in
     let%bind () = Internal.Cred_cache.initialize cred_cache_staging principal in
     let%bind () =
-      Deferred.Or_error.List.iter all_creds ~f:(fun creds ->
+      Deferred.Or_error.List.iter ~how:`Sequential all_creds ~f:(fun creds ->
         Internal.Cred_cache.store cred_cache_staging creds)
     in
     Deferred.Or_error.try_with ~here:[%here] (fun () -> Unix.rename ~src ~dst)

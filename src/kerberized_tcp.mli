@@ -66,6 +66,10 @@ module Server : sig
            function passed into [Server.create]. This includes any exceptions raised by the
            handler function as well as errors in de/encrypting messages. It defaults to
            [`Raise]. *)
+       -> ?override_supported_versions:int list
+       (** [override_supported_versions] overrides the versions the server
+           advertises and accepts. This should only be used in a testing context,
+           otherwise krb version negotiation might yield a weird result. *)
        -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
        -> krb_mode:Mode.Server.t
        -> Tcp.Where_to_listen.inet
@@ -112,6 +116,7 @@ module Internal : sig
            ]
       -> ?on_handler_error:
            [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+      -> ?override_supported_versions:int list
       -> authorize:'authorize
       -> krb_mode:Mode.Server.t
       -> 'r
@@ -124,14 +129,28 @@ module Internal : sig
         krb_args
         async_tcp_server_args
 
-    val create_handler
-      : ( Authorize.t
-        , Async_protocol.Connection.t handle_client
-          -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
-               Deferred.Or_error.t )
-          krb_args
+    type ('authorize, 'connection) create_handler :=
+      ( 'authorize
+      , 'connection handle_client
+      -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
+           Deferred.Or_error.t )
+        krb_args
 
-    val create : (Authorize.t, Async_protocol.Connection.t) serve
+    (** [additional_magic_numbers] adds additional magic numbers to be
+        advertised by the server during protocol negotiation, usually in
+        the context of reporting metadata about the server. If
+        [override_supported_versions] is also specified, these numbers are
+        still going to be advertised.
+
+        These two arguments are ignored when using [Test_with_principal] as Krb mode. *)
+
+    val create_handler
+      :  ?additional_magic_numbers:int list
+      -> (Authorize.t, Async_protocol.Connection.t) create_handler
+
+    val create
+      :  ?additional_magic_numbers:int list
+      -> (Authorize.t, Async_protocol.Connection.t) serve
 
     module Krb_or_anon_conn : sig
       type t =
@@ -140,14 +159,18 @@ module Internal : sig
     end
 
     (** This is a bit misleading because it doesn't work with an unkerberized tcp client.
-        It is in an [Internal] module because it is useful for implementing
-        kerberized rpc [serve_with_anon].
+        It is in an [Internal] module because it is useful for implementing kerberized rpc
+        [create_handler_with_anon].
 
-        The [create_with_anon] server peeks the first few bytes to check if the client is
-        sending a kerberos protocol header. If the unkerberized tcp client is expecting
-        the server to send some initial bytes, it will be waiting until something
-        presumably times out because the server is waiting for the client to send bytes
-        also. *)
+        The [create_handler_with_anon] server peeks the first few bytes to check if the
+        client is sending a kerberos protocol header. If the unkerberized tcp client is
+        expecting the server to send some initial bytes, it will be waiting until
+        something presumably times out because the server is waiting for the client to
+        send bytes also. *)
+    val create_handler_with_anon : (Authorize.Anon.t, Krb_or_anon_conn.t) create_handler
+
+    (** Similar to [create_handler_with_anon], but creates a tcp server, rather than just
+        the client handler. *)
     val create_with_anon : (Authorize.Anon.t, Krb_or_anon_conn.t) serve
   end
 end

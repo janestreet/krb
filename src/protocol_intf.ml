@@ -38,7 +38,9 @@ module type Connection = sig
 end
 
 type 'a with_serve_krb_args =
-  authorize:Authorize.t
+  ?override_supported_versions:int list
+  -> ?additional_magic_numbers:int list
+  -> authorize:Authorize.t
   -> accepted_conn_types:Conn_type_preference.t
   -> principal:Principal.t
   -> peer:Socket.Address.Inet.t

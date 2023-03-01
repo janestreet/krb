@@ -70,7 +70,7 @@ let entries_by_kvno keytab =
 let entries_for_principal keytab principal =
   let target_principal = Principal.to_string principal in
   let%bind entries = entries keytab in
-  Deferred.List.filter entries ~f:(fun entry ->
+  Deferred.List.filter ~how:`Sequential entries ~f:(fun entry ->
     match%map.Deferred Internal.Keytab_entry.principal entry with
     | Error _ -> false
     | Ok entry_principal ->
@@ -80,7 +80,7 @@ let entries_for_principal keytab principal =
 
 let validate keytab principal =
   let keytab_path_omitted_in_test keytab =
-    if am_running_inline_test then "<omitted-in-tests>" else path keytab
+    if Ppx_inline_test_lib.am_running then "<omitted-in-tests>" else path keytab
   in
   let keytab_advice =
     "You should probably use [Krb.Mode.Server.kerberized ()], which does proper \
@@ -129,11 +129,12 @@ module Stable_group = struct
         | `Ok indexes -> indexes
         | `Duplicate -> indexes)
     in
-    List.Assoc.sort_and_group
-      with_class
-      ~compare:
-        (Comparable.lift Int.compare ~f:(fun _class ->
-           Map.find_exn first_occurences _class))
+    List.Assoc.sort_and_group with_class ~compare:(fun a b ->
+      Comparable.lift
+        Int.compare
+        ~f:(fun _class -> Map.find_exn first_occurences _class)
+        a
+        b)
   ;;
 
   let%expect_test "stable_group" =
@@ -154,12 +155,12 @@ let latest_keys keytab =
     Deferred.Or_error.try_with_join (fun () -> entries_by_kvno keytab >>| Map.max_elt_exn)
   in
   let%bind keyblocks =
-    Deferred.Or_error.List.map entries ~f:(fun entry ->
+    Deferred.Or_error.List.map ~how:`Sequential entries ~f:(fun entry ->
       Internal.Keytab_entry.keyblock entry)
     >>| (* We want to preserve the order of the encryption types to keep
            keytabs easy to inspect.*)
     Stable_group.group (module Internal.Enctype) ~equiv:Internal.Keyblock.enctype
-    >>= Deferred.Or_error.List.map ~f:(fun (enctype, keyblocks) ->
+    >>= Deferred.Or_error.List.map ~how:`Sequential ~f:(fun (enctype, keyblocks) ->
       match
         List.dedup_and_sort ~compare:[%compare: Internal.Keyblock.t] keyblocks
       with
@@ -176,7 +177,7 @@ let latest_keys keytab =
 let add_spn t spn =
   let%bind kvno, keyblocks = latest_keys t in
   let%bind new_principal = Principal.create spn in
-  Deferred.Or_error.List.iter keyblocks ~f:(fun keyblock ->
+  Deferred.Or_error.List.iter ~how:`Sequential keyblocks ~f:(fun keyblock ->
     let%bind entry = Internal.Keytab_entry.create new_principal ~kvno keyblock in
     add_entry t entry)
 ;;
@@ -184,13 +185,14 @@ let add_spn t spn =
 let remove_spn t spn =
   let%bind entries = Internal.Keytab.entries t in
   let%bind to_remove =
-    Deferred.Or_error.List.filter entries ~f:(fun entry ->
+    Deferred.Or_error.List.filter ~how:`Sequential entries ~f:(fun entry ->
       let%bind entry_principal =
         Internal.Keytab_entry.principal entry >>| Principal.name
       in
       return ([%compare.equal: Principal.Name.t] entry_principal spn))
   in
-  Deferred.Or_error.List.iter to_remove ~f:(fun entry -> remove_entry t entry)
+  Deferred.Or_error.List.iter ~how:`Sequential to_remove ~f:(fun entry ->
+    remove_entry t entry)
 ;;
 
 let add_entry t ~password ~enctype ~kvno ~principal =
@@ -202,7 +204,7 @@ let add_entry t ~password ~enctype ~kvno ~principal =
 
 let update_user_keytab_entries t ~user_entries ~password ~kvno =
   let open Deferred.Or_error.Let_syntax in
-  Deferred.Or_error.List.iter user_entries ~f:(fun user_entry ->
+  Deferred.Or_error.List.iter ~how:`Sequential user_entries ~f:(fun user_entry ->
     let%bind old_keyblock = Internal.Keytab_entry.keyblock user_entry in
     let enctype = Internal.Keyblock.enctype old_keyblock in
     let%bind principal = Internal.Keytab_entry.principal user_entry in
@@ -213,7 +215,7 @@ let add_new_entry_for_all_principals ?kvno t ~password =
   let%bind latest_keytab_kvno, entries = entries_by_kvno t >>| Map.max_elt_exn in
   let kvno = Option.value kvno ~default:(latest_keytab_kvno + 1) in
   let%bind principals_and_entries =
-    Deferred.Or_error.List.map entries ~f:(fun entry ->
+    Deferred.Or_error.List.map ~how:`Sequential entries ~f:(fun entry ->
       let%map principal_name =
         Internal.Keytab_entry.principal entry >>| Principal.name
       in
@@ -249,6 +251,8 @@ let add_new_entry_for_all_principals ?kvno t ~password =
     latest_keys t
   in
   let%bind () = update_user_keytab_entries t ~user_entries ~password ~kvno in
-  let%bind () = Deferred.Or_error.List.iter spns ~f:(fun spn -> add_spn t spn) in
+  let%bind () =
+    Deferred.Or_error.List.iter ~how:`Sequential spns ~f:(fun spn -> add_spn t spn)
+  in
   return ()
 ;;

@@ -21,6 +21,6 @@ module Make (S : Arg) = struct
       let result = gather [] in
       let%bind () = S.Cursor.finish c container_raw cursor in
       result)
-    >>=? Deferred.Or_error.List.map ~f:S.Item.of_raw
+    >>=? Deferred.Or_error.List.map ~how:`Sequential ~f:S.Item.of_raw
   ;;
 end
