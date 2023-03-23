@@ -57,7 +57,6 @@ let negotiate_strongest ~us ~peer =
 ;;
 
 let is_as_strong client ~as_:server = Int.(strength client >= strength server)
-
 let%test "is_as_strong reflexive" = List.for_all all ~f:(fun t -> is_as_strong t ~as_:t)
 
 let%test "is_as_strong" =

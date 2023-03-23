@@ -216,9 +216,7 @@ let add_new_entry_for_all_principals ?kvno t ~password =
   let kvno = Option.value kvno ~default:(latest_keytab_kvno + 1) in
   let%bind principals_and_entries =
     Deferred.Or_error.List.map ~how:`Sequential entries ~f:(fun entry ->
-      let%map principal_name =
-        Internal.Keytab_entry.principal entry >>| Principal.name
-      in
+      let%map principal_name = Internal.Keytab_entry.principal entry >>| Principal.name in
       principal_name, entry)
   in
   let spns =

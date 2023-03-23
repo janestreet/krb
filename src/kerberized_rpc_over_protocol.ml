@@ -165,9 +165,7 @@ let client
     Option.some_if
       (Connection.can_forward_creds conn)
       (Rpc.Rpc.implement Request_forwarded_creds_rpc.rpc (fun _ () ->
-         match
-           on_credential_forwarding_request { Server_principal.server_principal }
-         with
+         match on_credential_forwarding_request { Server_principal.server_principal } with
          | Allow_server_to_impersonate_me { forwardable_tkt } ->
            Connection.make_krb_cred conn ~forwardable:forwardable_tkt
          | Deny ->
@@ -275,9 +273,7 @@ module For_testing = struct
                if [%compare.equal: Principal.Name.t] service server_principal
                && [%compare.equal: Socket.Address.Inet.t]
                     server_address
-                    (Socket.Address.Inet.create
-                       (Unix.Inet_addr.of_string host)
-                       ~port)
+                    (Socket.Address.Inet.create (Unix.Inet_addr.of_string host) ~port)
                then `Accept
                else `Reject))
           ~krb_mode

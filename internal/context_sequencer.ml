@@ -20,8 +20,7 @@ let the_t : t Lazy_deferred.t =
     if Shutdown.is_shutting_down ()
     then
       failwith
-        "Not initializing global Kerberos context because async is already shutting \
-         down";
+        "Not initializing global Kerberos context because async is already shutting down";
     Krb_debug.log_s (fun () -> [%message "Initializing global Kerberos context"]);
     let context_initialized = Ivar.create () in
     Shutdown.don't_finish_before (Ivar.read context_initialized);

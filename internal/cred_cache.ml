@@ -224,11 +224,7 @@ let store_if_not_in_cache t ~request cred =
   in
   Context_sequencer.enqueue_job_with_info ~info ~f:(fun c ->
     match
-      Raw.get_credentials
-        c
-        [ KRB5_GC_CACHED ]
-        t.raw
-        ~request:(Credentials.to_raw request)
+      Raw.get_credentials c [ KRB5_GC_CACHED ] t.raw ~request:(Credentials.to_raw request)
     with
     | Ok credentials_raw ->
       Credentials.Raw.free c credentials_raw;
@@ -243,7 +239,8 @@ let principal t =
     | -1765328189l ->
       (match%map cache_type t with
        | MEMORY ->
-         [%message "call [Cred_cache.initialize_with_creds] to create a credential cache."]
+         [%message
+           "call [Cred_cache.initialize_with_creds] to create a credential cache."]
        | FILE | DIR -> [%message "call `kinit` to create a credential cache."]
        | _ -> Sexp.unit)
     | _ -> return Sexp.unit

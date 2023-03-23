@@ -264,13 +264,7 @@ module V0 = struct
       in
       let info = Krb_info.create ~tag_arguments "[krb5_mk_req]" in
       Context_sequencer.enqueue_job_with_info ~info ~f:(fun c ->
-        Raw.make_ap_req
-          c
-          auth_context
-          flags
-          ~service
-          ~hostname
-          (Cred_cache.to_raw ccache))
+        Raw.make_ap_req c auth_context flags ~service ~hostname (Cred_cache.to_raw ccache))
     ;;
 
     let init_aux ?handle_addrs ccache flags ~service ~hostname =

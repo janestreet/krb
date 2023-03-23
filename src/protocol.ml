@@ -1343,7 +1343,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
            Log.Global.sexp
              ~level:`Info
              [%message
-               "Failed to get credentials from default cache (succeeded with memory cache)"
+               "Failed to get credentials from default cache (succeeded with memory \
+                cache)"
                  (error : Error.t)
                  (client_cred_cache : Client_cred_cache.t)]);
         let init_auth_context () =
@@ -1630,7 +1631,8 @@ module Make (Backend : Protocol_backend_intf.S) = struct
            Log.Global.sexp
              ~level:`Info
              [%message
-               "Failed to get credentials from default cache (succeeded with memory cache)"
+               "Failed to get credentials from default cache (succeeded with memory \
+                cache)"
                  (error : Error.t)
                  (client_cred_cache : Client_cred_cache.t)]);
         let init_auth_context () =
