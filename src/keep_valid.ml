@@ -211,7 +211,7 @@ let keep_valid
     let%bind result =
       ensure_valid ?keytab ~cred_cache ~valid_for_at_least:refresh_every principal
     in
-    Ivar.fill ivar result;
+    Ivar.fill_exn ivar result;
     (match result with
      | Ok () ->
        if not !removed

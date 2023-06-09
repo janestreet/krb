@@ -27,7 +27,7 @@ let the_t : t Lazy_deferred.t =
     let%map t =
       In_thread.run Context.init
       >>| (fun result ->
-        Ivar.fill context_initialized ();
+        Ivar.fill_exn context_initialized ();
         result)
       >>| Result.map_error ~f:(fun code ->
         let krb_error = Krb_error.to_string ~info:"krb5_init_context" code in

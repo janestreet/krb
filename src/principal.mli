@@ -94,7 +94,7 @@ val kvno : ?cred_cache:Internal.Cred_cache.t -> t -> int Deferred.Or_error.t
 module Stable : sig
   module Name : sig
     module V1 : sig
-      type t = Name.t [@@deriving bin_io, compare, sexp]
+      type t = Name.t [@@deriving bin_io, compare, sexp, stable_witness]
 
       include
         Comparable.Stable.V1.S

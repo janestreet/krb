@@ -1657,6 +1657,20 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~peer:(Header.Server.accepted_conn_types server_header)
         |> return
         >>=? fun conn_type ->
+        let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
+        Cred_cache.Cross_realm.principal cred_cache
+        >>=? fun my_principal ->
+        let server_principal_name = Header.Server.principal server_header in
+        (* Check the server principal before sending the [ap_req]. This prevents a
+           hijacked server from getting its hands on an [ap_req] for servers the client
+           doesn't trust. *)
+        Authorizer.run
+          ~authorize
+          ~acting_as:Client
+          ~my_principal
+          ~peer_address:peer
+          ~peer_principal:server_principal_name
+        >>=? fun () ->
         debug_log_connection_setup
           ~peer
           ~conn_type
@@ -1677,19 +1691,6 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         Header.Ap_rep.read ~backend
         >>=? fun ap_rep ->
         Auth_context.Client.read_and_verify_ap_rep auth_context ~ap_rep
-        >>=? fun () ->
-        let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
-        Cred_cache.Cross_realm.principal cred_cache
-        >>=? fun my_principal ->
-        let server_principal_name = Header.Server.principal server_header in
-        (* Check the server principal after receiving the [ap_rep]. Otherwise, we can't
-           trust the principal if the connection type is [Auth]. *)
-        Authorizer.run
-          ~authorize
-          ~acting_as:Client
-          ~my_principal
-          ~peer_address:peer
-          ~peer_principal:server_principal_name
         >>=? fun () ->
         write_field ~conn_type ~auth_context ~backend Unit.bin_writer_t ()
         >>=? fun () ->

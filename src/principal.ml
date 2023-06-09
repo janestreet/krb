@@ -10,7 +10,7 @@ module Stable = struct
               { service : string
               ; hostname : string
               }
-        [@@deriving bin_io, compare, hash, sexp]
+        [@@deriving bin_io, compare, hash, sexp, stable_witness]
 
         let%expect_test _ =
           print_endline [%bin_digest: t];

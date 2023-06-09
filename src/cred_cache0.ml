@@ -37,7 +37,7 @@ module Cross_realm = struct
         let%bind principal = Principal.Cross_realm.create principal_name in
         Internal.Cred_cache.create MEMORY principal
       in
-      Ivar.fill ivar result;
+      Ivar.fill_exn ivar result;
       (match result with
        | Ok cred_cache ->
          Hashtbl.set in_memory_cred_caches ~key:principal_name ~data:(`Ok cred_cache)

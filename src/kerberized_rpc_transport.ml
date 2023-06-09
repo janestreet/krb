@@ -149,7 +149,7 @@ end = struct
   let mark_scheduled t id =
     match Hashtbl.find_and_remove t id with
     | None -> ()
-    | Some ivar -> Ivar.fill ivar ()
+    | Some ivar -> Ivar.fill_exn ivar ()
   ;;
 end
 
@@ -200,7 +200,7 @@ module Writer = struct
   let close t =
     if not (is_closed t)
     then (
-      Ivar.fill t.close_started ();
+      Ivar.fill_exn t.close_started ();
       let%bind () = Pending_writes.all_scheduled t.pending_writes in
       Writer.close t.writer)
     else Writer.close_finished t.writer
@@ -249,18 +249,19 @@ module Writer = struct
   ;;
 
   let send_bin_prot (type a) t (bin_writer : a Bin_prot.Type_class.writer) (value : a) =
-    if is_closed t
-    then Transport.Send_result.Closed
-    else (
-      let size = bin_writer.size value in
-      let payload = Bigstring.create size in
-      let bytes_written = bin_writer.write payload ~pos:0 value in
-      assert (Int.equal bytes_written size);
-      if message_size_ok t ~payload_length:size
-      then (
-        don't_wait_for (send_payload t payload);
-        Transport.Send_result.Sent ())
-      else Message_too_big { size; max_message_size = t.max_message_size })
+    
+      (if is_closed t
+       then Transport.Send_result.Closed
+       else (
+         let size = bin_writer.size value in
+         let payload = Bigstring.create size in
+         let bytes_written = bin_writer.write payload ~pos:0 value in
+         assert (Int.equal bytes_written size);
+         if message_size_ok t ~payload_length:size
+         then (
+           don't_wait_for (send_payload t payload);
+           Transport.Send_result.Sent { result = (); bytes = size })
+         else Message_too_big { size; max_message_size = t.max_message_size }))
   ;;
 
   (* We always need to copy the inputs to be able to pass them to [encode]. *)
@@ -273,32 +274,39 @@ module Writer = struct
         ~pos
         ~len
     =
-    if is_closed t
-    then Transport.Send_result.Closed
-    else (
-      let bin_prot_size = bin_writer.size value in
-      let payload_size = bin_prot_size + len in
-      let payload = Bigstring.create payload_size in
-      let bin_prot_bytes_written = bin_writer.write payload ~pos:0 value in
-      assert (Int.equal bin_prot_size bin_prot_bytes_written);
-      Bigstring.blit
-        ~src:buf
-        ~src_pos:pos
-        ~dst:payload
-        ~dst_pos:bin_prot_bytes_written
-        ~len;
-      if message_size_ok t ~payload_length:payload_size
-      then send_payload t payload |> Transport.Send_result.Sent
-      else Message_too_big { size = payload_size; max_message_size = t.max_message_size })
+    
+      (if is_closed t
+       then Transport.Send_result.Closed
+       else (
+         let bin_prot_size = bin_writer.size value in
+         let payload_size = bin_prot_size + len in
+         let payload = Bigstring.create payload_size in
+         let bin_prot_bytes_written = bin_writer.write payload ~pos:0 value in
+         assert (Int.equal bin_prot_size bin_prot_bytes_written);
+         Bigstring.blit
+           ~src:buf
+           ~src_pos:pos
+           ~dst:payload
+           ~dst_pos:bin_prot_bytes_written
+           ~len;
+         if message_size_ok t ~payload_length:payload_size
+         then
+           Transport.Send_result.Sent
+             { result = send_payload t payload; bytes = payload_size }
+         else
+           Message_too_big { size = payload_size; max_message_size = t.max_message_size }))
   ;;
 
   let send_bin_prot_and_bigstring t bin_writer_t value ~buf ~pos ~len =
-    match send_bin_prot_and_bigstring_non_copying t bin_writer_t value ~buf ~pos ~len with
-    | Transport.Send_result.Sent def ->
-      don't_wait_for def;
-      Transport.Send_result.Sent ()
-    | Closed -> Closed
-    | Message_too_big mtb -> Message_too_big mtb
+    
+      (match
+         send_bin_prot_and_bigstring_non_copying t bin_writer_t value ~buf ~pos ~len
+       with
+       | Transport.Send_result.Sent { result = def; bytes } ->
+         don't_wait_for def;
+         Transport.Send_result.Sent { result = (); bytes }
+       | Closed -> Closed
+       | Message_too_big mtb -> Message_too_big mtb)
   ;;
 end
 
