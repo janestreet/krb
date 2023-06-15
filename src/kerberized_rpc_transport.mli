@@ -2,6 +2,8 @@ open! Core
 open! Async
 open! Import
 
+val effective_max_message_size : proposed_max:int option -> int
+
 type tcp_on_error :=
   [ `Call of Socket.Address.Inet.t -> exn -> unit
   | `Ignore

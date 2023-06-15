@@ -16,25 +16,28 @@ module Client = struct
     =
     let open Deferred.Or_error.Let_syntax in
     let peer = Socket.getpeername socket in
-    match krb_mode_with_client_cred_cache with
-    | `Test_with_principal principal ->
-      let%bind connection, authorize_result =
-        Protocol.Test_mode.Client.handshake
+    let connection =
+      match krb_mode_with_client_cred_cache with
+      | `Test_with_principal principal ->
+        let%bind connection, authorize_result =
+          Protocol.Test_mode.Client.handshake
+            ~authorize
+            ~principal
+            ~server_addr:peer
+            backend
+        in
+        let%map () = Deferred.return authorize_result in
+        connection
+      | `Kerberized (accepted_conn_types, client_cred_cache) ->
+        Protocol.Client.handshake
+          ?override_supported_versions
           ~authorize
-          ~principal
-          ~server_addr:peer
+          ~client_cred_cache
+          ~accepted_conn_types
+          ~peer
           backend
-      in
-      let%map () = Deferred.return authorize_result in
-      connection
-    | `Kerberized (accepted_conn_types, client_cred_cache) ->
-      Protocol.Client.handshake
-        ?override_supported_versions
-        ~authorize
-        ~client_cred_cache
-        ~accepted_conn_types
-        ~peer
-        backend
+    in
+    Deferred.Or_error.tag_s ~tag:[%message "Krb handshake failed"] connection
   ;;
 
   let[@warning "-16"] handshake

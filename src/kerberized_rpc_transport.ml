@@ -310,20 +310,80 @@ module Writer = struct
   ;;
 end
 
-let default_max_message_size =
-  Lazy.from_fun (fun () ->
-    match Sys.getenv "KRB_RPC_MAX_MESSAGE_SIZE" with
-    | None ->
-      (* copied from RPC (which in turn is copied from reader0.ml) *)
-      100 * 1024 * 1024
-    | Some max_message_size -> Int.of_string max_message_size)
+(* Maybe we should drop this environment variable so that the Async_rpc one is the only
+   way to set this via the environment, but someone may be relying on this variable, so
+   we're stuck with it. (And maybe someone actually wants the flexibility of having a
+   separate env var for kerberized rpcs?) *)
+let environment_variable = "KRB_RPC_MAX_MESSAGE_SIZE"
+
+let max_message_size_from_environment =
+  lazy
+    (Option.try_with_join (fun () ->
+       Sys.getenv environment_variable |> Option.map ~f:Int.of_string))
+;;
+
+let aux_effective_max_message_size ~max_message_size_from_environment ~proposed_max =
+  let default =
+    (* copied from RPC (which in turn is copied from reader0.ml) *)
+    100 * 1024 * 1024
+  in
+  match proposed_max, max_message_size_from_environment with
+  | None, None -> default
+  (* We allow the env var to decrease the value from the default because it seems fine and
+     matches previous behavior. But allowing the env var to decrease the size from a
+     supplied [~max_message_size] could be problematic[0], so we take the max in that case
+
+     [0] E.g., a user sets it to 200MB thinking they're increasing it, but a library they
+     use does [~max_message_size:300MB] *)
+  | Some x, None | None, Some x -> x
+  | Some x, Some y -> Int.max x y
+;;
+
+let%expect_test " " =
+  let test ~max_message_size_from_environment =
+    List.iter
+      [ None; Some 1; Some (200 * 1024 * 1024) ]
+      ~f:(fun proposed_max ->
+        let effective_max =
+          aux_effective_max_message_size ~max_message_size_from_environment ~proposed_max
+          |> Byte_units.of_bytes_int
+        in
+        let proposed_max = Option.map proposed_max ~f:Byte_units.of_bytes_int in
+        print_s
+          [%message (proposed_max : Byte_units.t option) (effective_max : Byte_units.t)])
+  in
+  test ~max_message_size_from_environment:None;
+  [%expect
+    {|
+    ((proposed_max ()) (effective_max 100M))
+    ((proposed_max (1B)) (effective_max 1B))
+    ((proposed_max (200M)) (effective_max 200M)) |}];
+  test ~max_message_size_from_environment:(Some 1024);
+  [%expect
+    {|
+    ((proposed_max ()) (effective_max 1K))
+    ((proposed_max (1B)) (effective_max 1K))
+    ((proposed_max (200M)) (effective_max 200M)) |}];
+  test ~max_message_size_from_environment:(Some (300 * 1024 * 1024));
+  [%expect
+    {|
+    ((proposed_max ()) (effective_max 300M))
+    ((proposed_max (1B)) (effective_max 300M))
+    ((proposed_max (200M)) (effective_max 300M)) |}];
+  return ()
+;;
+
+let effective_max_message_size ~proposed_max =
+  let max_message_size_from_environment = force max_message_size_from_environment in
+  aux_effective_max_message_size ~max_message_size_from_environment ~proposed_max
 ;;
 
 let of_connection
       ?(on_done_with_internal_buffer = `Do_nothing)
-      ?(max_message_size = force default_max_message_size)
+      ?max_message_size:proposed_max
       connection
   =
+  let max_message_size = effective_max_message_size ~proposed_max in
   if max_message_size < 0
   then
     failwithf
@@ -405,11 +465,9 @@ module Tcp = struct
       | Ok transport -> handle_client addr transport connection)
   ;;
 
-  let handle_rpc_client ?max_message_size handle_client =
+  let handle_rpc_client ?max_message_size:proposed_max handle_client =
     Staged.stage (fun addr (reader, writer) ->
-      let max_message_size =
-        Option.value max_message_size ~default:(force default_max_message_size)
-      in
+      let max_message_size = effective_max_message_size ~proposed_max in
       let transport = Rpc.Transport.of_reader_writer ~max_message_size reader writer in
       handle_client addr transport None)
   ;;
