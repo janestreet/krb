@@ -30,8 +30,6 @@ val strongest : Set.t -> t option
 val negotiate_strongest : us:Set.t -> peer:Set.t -> t Or_error.t
 
 val is_as_strong : t -> as_:t -> bool
-val flag : t list Command.Param.t
-val optional_flag : t list option Command.Param.t
 
 module Stable : sig
   module V1 : sig
@@ -48,4 +46,9 @@ module Stable : sig
       with type comparable := t
       with type comparator_witness := comparator_witness
   end
+end
+
+module Deprecated : sig
+  val flag : t list Command.Param.t
+  val optional_flag : t list option Command.Param.t
 end

@@ -34,8 +34,6 @@ val prefer_strength : t
 val to_set : t -> Conn_type.Set.t
 val filter : t -> only_in:t -> t
 val negotiate : us:t -> peer:t -> Conn_type.t Or_error.t
-val flag : t Command.Param.t
-val optional_flag : t option Command.Param.t
 
 module Stable : sig
   open Core.Core_stable
@@ -54,4 +52,9 @@ module Stable : sig
       with type comparable := t
       with type comparator_witness := comparator_witness
   end
+end
+
+module Deprecated : sig
+  val flag : t Command.Param.t
+  val optional_flag : t option Command.Param.t
 end

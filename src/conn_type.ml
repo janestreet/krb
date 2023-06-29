@@ -75,19 +75,22 @@ let%test "is_as_strong" =
     ]
 ;;
 
-let arg_type =
-  Command.Arg_type.create of_string |> Command.Arg_type.comma_separated ~allow_empty:true
-;;
+module Deprecated = struct
+  let arg_type =
+    Command.Arg_type.create of_string
+    |> Command.Arg_type.comma_separated ~allow_empty:true
+  ;;
 
-let make_flag required_or_optional =
-  let open Command.Param in
-  flag
-    "conn-types"
-    (required_or_optional arg_type)
-    ~doc:
-      "(auth|safe|priv) What kind of Kerberos connection to use (specify multiple \
-       separated by comma)"
-;;
+  let make_flag required_or_optional =
+    let open Command.Param in
+    flag
+      "conn-types"
+      (required_or_optional arg_type)
+      ~doc:
+        "(auth|safe|priv) What kind of Kerberos connection to use (specify multiple \
+         separated by comma)"
+  ;;
 
-let flag = make_flag Command.Param.required
-let optional_flag = make_flag Command.Param.optional
+  let flag = make_flag Command.Param.required
+  let optional_flag = make_flag Command.Param.optional
+end

@@ -84,35 +84,37 @@ let negotiate ~us ~peer =
          ~peer:(Conn_type.Set.of_list p_peer))
 ;;
 
-let arg_type =
-  Command.Arg_type.create Conn_type.of_string
-  |> Command.Arg_type.comma_separated ~allow_empty:true
-;;
+module Deprecated = struct
+  let arg_type =
+    Command.Arg_type.create Conn_type.of_string
+    |> Command.Arg_type.comma_separated ~allow_empty:true
+  ;;
 
-let optional_prefer_flag =
-  let open Command.Param in
-  flag
-    "conn-types-prefer"
-    (optional arg_type)
-    ~doc:
-      "(auth|safe|priv) The connection types are ordered and express a preference \
-       (specify multiple separated by comma)"
-;;
+  let optional_prefer_flag =
+    let open Command.Param in
+    flag
+      "conn-types-prefer"
+      (optional arg_type)
+      ~doc:
+        "(auth|safe|priv) The connection types are ordered and express a preference \
+         (specify multiple separated by comma)"
+  ;;
 
-let optional_flag =
-  let open Command.Param in
-  choose_one
-    ~if_nothing_chosen:(Default_to None)
-    [ Conn_type.optional_flag
-      |> map ~f:(Option.map ~f:(fun x -> Some (Any (Conn_type.Set.of_list x))))
-    ; optional_prefer_flag |> map ~f:(Option.map ~f:(fun x -> Some (Prefer x)))
-    ]
-;;
+  let optional_flag =
+    let open Command.Param in
+    choose_one
+      ~if_nothing_chosen:(Default_to None)
+      [ Conn_type.Deprecated.optional_flag
+        |> map ~f:(Option.map ~f:(fun x -> Some (Any (Conn_type.Set.of_list x))))
+      ; optional_prefer_flag |> map ~f:(Option.map ~f:(fun x -> Some (Prefer x)))
+      ]
+  ;;
 
-let flag =
-  let message = "Must specify one of [-conn-types] or [-conn-types-prefer]" in
-  Command.Param.map optional_flag ~f:(fun x -> Option.value_exn ~message x)
-;;
+  let flag =
+    let message = "Must specify one of [-conn-types] or [-conn-types-prefer]" in
+    Command.Param.map optional_flag ~f:(fun x -> Option.value_exn ~message x)
+  ;;
+end
 
 let%test_unit "negotiate" =
   let test ~us ~peer ~(expect : Conn_type.t) =
