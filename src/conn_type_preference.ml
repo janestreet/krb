@@ -38,6 +38,7 @@ let accept_safe_priv = any [ Priv; Safe ]
 let accept_only conn_type = any [ conn_type ]
 let prefer_speed = Prefer [ Auth; Safe; Priv ]
 let prefer_strength = Prefer [ Priv; Safe; Auth ]
+let prefer_speed_no_auth = Prefer [ Safe; Priv ]
 
 let to_set = function
   | Prefer conn_types -> Conn_type.Set.of_list conn_types
@@ -84,6 +85,15 @@ let negotiate ~us ~peer =
          ~peer:(Conn_type.Set.of_list p_peer))
 ;;
 
+let allows_non_auth t =
+  let types =
+    match t with
+    | Prefer types -> types
+    | Any types -> Set.to_list types
+  in
+  List.exists types ~f:(Fn.non ([%compare.equal: Conn_type.t] Auth))
+;;
+
 module Deprecated = struct
   let arg_type =
     Command.Arg_type.create Conn_type.of_string
@@ -113,6 +123,15 @@ module Deprecated = struct
   let flag =
     let message = "Must specify one of [-conn-types] or [-conn-types-prefer]" in
     Command.Param.map optional_flag ~f:(fun x -> Option.value_exn ~message x)
+  ;;
+
+  let to_flag_args (t : Stable.V1.t) =
+    let flag, arg_list =
+      match t with
+      | Any conn_types -> "-conn-types", Set.to_list conn_types
+      | Prefer conn_types -> "-conn-types-prefer", conn_types
+    in
+    [ flag; List.map arg_list ~f:Conn_type.to_string |> String.concat ~sep:"," ]
   ;;
 end
 

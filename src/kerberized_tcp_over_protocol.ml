@@ -28,12 +28,12 @@ module Client = struct
         in
         let%map () = Deferred.return authorize_result in
         connection
-      | `Kerberized (accepted_conn_types, client_cred_cache) ->
+      | `Kerberized (conn_type_preference, client_cred_cache) ->
         Protocol.Client.handshake
           ?override_supported_versions
           ~authorize
           ~client_cred_cache
-          ~accepted_conn_types
+          ~conn_type_preference
           ~peer
           backend
     in
@@ -92,13 +92,13 @@ module Client = struct
     let open Deferred.Or_error.Let_syntax in
     match (krb_mode : Mode.Client.t) with
     | Test_with_principal principal -> return (`Test_with_principal principal)
-    | Kerberized accepted_conn_types ->
+    | Kerberized conn_type_preference ->
       let%bind client_cred_cache =
         match cred_cache with
         | None -> Client_cred_cache.in_memory ()
         | Some cred_cache -> Client_cred_cache.of_cred_cache cred_cache
       in
-      return (`Kerberized (accepted_conn_types, client_cred_cache))
+      return (`Kerberized (conn_type_preference, client_cred_cache))
   ;;
 
   let connect_and_handshake
@@ -281,7 +281,7 @@ module Server = struct
         krb_mode
     =
     match (krb_mode : Mode.Server.t) with
-    | Kerberized (key_source, accepted_conn_types) ->
+    | Kerberized (key_source, conn_type_preference) ->
       Endpoint.create key_source
       >>=? fun (principal, get_endpoint) ->
       let server_protocol ~peer backend =
@@ -293,7 +293,7 @@ module Server = struct
             ?override_supported_versions
             ?additional_magic_numbers
             ~authorize
-            ~accepted_conn_types
+            ~conn_type_preference
             ~principal
             endpoint
             ~peer

@@ -41,7 +41,7 @@ type 'a with_serve_krb_args =
   ?override_supported_versions:int list
   -> ?additional_magic_numbers:int list
   -> authorize:Authorize.t
-  -> accepted_conn_types:Conn_type_preference.t
+  -> conn_type_preference:Conn_type_preference.t
   -> principal:Principal.t
   -> peer:Socket.Address.Inet.t
   -> [ `Service of Keytab.t | `User_to_user_via_tgt of Internal.Credentials.t ]
@@ -71,7 +71,7 @@ module type S = sig
       :  ?override_supported_versions:int list
       -> authorize:Authorize.t
       -> client_cred_cache:Client_cred_cache.t
-      -> accepted_conn_types:Conn_type_preference.t
+      -> conn_type_preference:Conn_type_preference.t
       -> peer:Socket.Address.Inet.t
       -> protocol_backend
       -> Connection.t Deferred.Or_error.t
