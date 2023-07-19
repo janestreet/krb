@@ -24,8 +24,8 @@ module Client : sig
     -> ?time_source:Time_source.t
     -> ?override_supported_versions:int list
     -> ?cred_cache:Cred_cache.t
+    -> ?krb_mode:Mode.Client.t
     -> authorize:Authorize.t
-    -> krb_mode:Mode.Client.t
     -> Socket.Address.Inet.t Tcp.Where_to_connect.t
     -> 'conn Deferred.Or_error.t
 
@@ -45,8 +45,8 @@ module Client : sig
     -> ?timeout:Time.Span.t
     -> ?override_supported_versions:int list
     -> ?cred_cache:Cred_cache.t
+    -> ?krb_mode:Mode.Client.t
     -> authorize:Authorize.t
-    -> krb_mode:Mode.Client.t
     -> Socket.Address.Inet.t Tcp.Where_to_connect.t
     -> ('conn * ([ `Active ], Socket.Address.Inet.t) Socket.t) Deferred.Or_error.t
 end
@@ -94,7 +94,8 @@ module Server : sig
          with type protocol_backend = 'backend
           and type Connection.t = 'conn)
     -> authorize:Authorize.t
-    -> Mode.Server.t
+    -> krb_mode:Mode.Server.t
+    -> unit
     -> (peer:Socket.Address.Inet.t
         -> 'backend
         -> ( 'conn
@@ -119,7 +120,8 @@ module Server : sig
              ]
                Deferred.t)
     -> authorize:Authorize.Anon.t
-    -> Mode.Server.t
+    -> krb_mode:Mode.Server.t
+    -> unit
     -> (peer:Socket.Address.Inet.t
         -> 'backend
         -> ( [ `Anon | `Krb of 'conn ]

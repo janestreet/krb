@@ -19,7 +19,7 @@ struct
         ?max_message_size
         ?handshake_timeout
         ?heartbeat_config
-        ~krb_mode
+        ?krb_mode
         ?bind_to_address
         ?implementations
         ?description
@@ -41,8 +41,8 @@ struct
           ?implementations
           ?description
           ?cred_cache
+          ?krb_mode
           ~authorize
-          ~krb_mode
           (Tcp.Where_to_connect.of_host_and_port ?bind_to_address { host; port })
         |> T.conn_of_rpc_connection)
       ~address:(module Host_and_port)

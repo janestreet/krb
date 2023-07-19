@@ -90,6 +90,11 @@ module Client = struct
 
   let krb_mode_with_client_cred_cache ?cred_cache krb_mode =
     let open Deferred.Or_error.Let_syntax in
+    let krb_mode =
+      match krb_mode with
+      | None -> Mode.Client.kerberized ()
+      | Some krb_mode -> krb_mode
+    in
     match (krb_mode : Mode.Client.t) with
     | Test_with_principal principal -> return (`Test_with_principal principal)
     | Kerberized conn_type_preference ->
@@ -115,8 +120,8 @@ module Client = struct
         ?time_source
         ?override_supported_versions
         ?cred_cache
+        ?krb_mode
         ~authorize
-        ~krb_mode
         where_to_connect
     =
     (* we have to do this logic upfront so that we don't try to connect if there is
@@ -152,8 +157,8 @@ module Client = struct
         ?timeout
         ?override_supported_versions
         ?cred_cache
+        ?krb_mode
         ~authorize
-        ~krb_mode
         where_to_connect
     =
     (* we have to do this logic upfront so that we don't try to connect if there is
@@ -278,7 +283,8 @@ module Server = struct
           with type protocol_backend = backend
            and type Connection.t = conn)
         ~authorize
-        krb_mode
+        ~krb_mode
+        ()
     =
     match (krb_mode : Mode.Server.t) with
     | Kerberized (key_source, conn_type_preference) ->
@@ -316,14 +322,16 @@ module Server = struct
            and type Connection.t = conn)
         ~peek_protocol_version_header
         ~authorize
-        krb_mode
+        ~krb_mode
+        ()
     =
     let authorize_mapped = Authorize.krb_of_anon authorize in
     krb_server_protocol
       ?override_supported_versions
       (module Protocol)
       ~authorize:authorize_mapped
-      krb_mode
+      ~krb_mode
+      ()
     >>=? fun krb_server_protocol ->
     let server_protocol ~peer backend =
       let%bind peek_result =

@@ -6,8 +6,8 @@ type 'a with_krb_args =
   ?cred_cache:Cred_cache.t
   (** This defaults to [Cred_cache.default] for a [TGT] key source and a new MEMORY cache
       for a [Keytab] key source. *)
+  -> ?krb_mode:Mode.Client.t (** This defaults to [Mode.Client.kerberized ()] *)
   -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
-  -> krb_mode:Mode.Client.t
   -> 'a
 
 type 'a with_connect_args =
@@ -86,8 +86,8 @@ module Internal : sig
   val connect
     : (?override_supported_versions:int list
        -> ?cred_cache:Cred_cache.t
+       -> ?krb_mode:Mode.Client.t
        -> authorize:Authorize.t
-       -> krb_mode:Mode.Client.t
        -> Socket.Address.Inet.t Tcp.Where_to_connect.t
        -> Async_protocol.Connection.t Deferred.Or_error.t)
         Tcp.Aliases.with_connect_options

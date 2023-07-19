@@ -97,7 +97,7 @@ module Stable : sig
       type t = Name.t [@@deriving bin_io, compare, sexp, stable_witness]
 
       include
-        Comparable.Stable.V1.S
+        Comparable.Stable.V1.With_stable_witness.S
         with type comparable := Name.t
         with type comparator_witness = Name.comparator_witness
     end

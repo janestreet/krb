@@ -95,7 +95,8 @@ module Connection : sig
     ( 'client_identity
     , 'authorize
     , 'conn_state
-    , Mode.Server.t
+    , krb_mode:Mode.Server.t
+    -> unit
     -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
          Deferred.Or_error.t )
       krb_rpc_args

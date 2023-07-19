@@ -14,7 +14,7 @@ type ('a, 'event) persistent_connection_args :=
   -> 'a
 
 type ('event, 't, 'state) create :=
-  ( (krb_mode:Mode.Client.t
+  ( (?krb_mode:Mode.Client.t
      -> ?bind_to_address:Unix.Inet_addr.t
      -> ?implementations:
        (Server_principal.t -> 'state Rpc.Connection.Client_implementations.t)

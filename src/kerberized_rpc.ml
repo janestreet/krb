@@ -153,7 +153,8 @@ module Connection = struct
         ~authorize
         ~implementations
         ~initial_connection_state
-        krb_mode
+        ~krb_mode
+        ()
     =
     Kerberized_rpc_transport.Tcp.create_handler
       ?max_message_size
@@ -181,7 +182,8 @@ module Connection = struct
         ~authorize
         ~implementations
         ~initial_connection_state
-        krb_mode
+        ~krb_mode
+        ()
     =
     Kerberized_rpc_transport.Tcp.create_handler_with_anon
       ?max_message_size
