@@ -42,7 +42,7 @@ module User = struct
     { username : string
     ; realm : Realm.t
     }
-  [@@deriving compare, fields, hash, sexp_of]
+  [@@deriving compare, fields ~getters, hash, sexp_of]
 
   let to_string { username; realm } = sprintf "%s@%s" username realm
 
@@ -67,7 +67,7 @@ module Service = struct
     ; hostname : string
     ; realm : Realm.t
     }
-  [@@deriving compare, fields, hash, sexp_of]
+  [@@deriving compare, fields ~getters, hash, sexp_of]
 
   let to_string { service; hostname; realm } = sprintf "%s/%s@%s" service hostname realm
 

@@ -7,7 +7,7 @@ type t =
   { reader : Reader.t
   ; writer : Writer.t
   }
-[@@deriving fields]
+[@@deriving fields ~getters]
 
 let create ~reader ~writer =
   let open Or_error.Let_syntax in

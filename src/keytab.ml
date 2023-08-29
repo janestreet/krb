@@ -202,16 +202,15 @@ let add_entry t ~password ~enctype ~kvno ~principal =
   add_entry t entry
 ;;
 
-let update_user_keytab_entries t ~user_entries ~password ~kvno =
+let update_user_keytab_entries t ~user_principal ~enctypes ~password ~kvno =
   let open Deferred.Or_error.Let_syntax in
-  Deferred.Or_error.List.iter ~how:`Sequential user_entries ~f:(fun user_entry ->
-    let%bind old_keyblock = Internal.Keytab_entry.keyblock user_entry in
-    let enctype = Internal.Keyblock.enctype old_keyblock in
-    let%bind principal = Internal.Keytab_entry.principal user_entry in
+  let%bind principal = Principal.create user_principal in
+  Set.to_list enctypes
+  |> Deferred.Or_error.List.iter ~how:`Sequential ~f:(fun enctype ->
     add_entry t ~password ~enctype ~kvno ~principal)
 ;;
 
-let add_new_entry_for_all_principals ?kvno t ~password =
+let add_new_entry_for_all_principals ?kvno t ~password ~enctypes =
   let%bind latest_keytab_kvno, entries = entries_by_kvno t >>| Map.max_elt_exn in
   let kvno = Option.value kvno ~default:(latest_keytab_kvno + 1) in
   let%bind principals_and_entries =
@@ -226,7 +225,7 @@ let add_new_entry_for_all_principals ?kvno t ~password =
        | Service _ -> Some principal))
     |> List.dedup_and_sort ~compare:[%compare: Principal.Name.t]
   in
-  let%bind user_entries =
+  let%bind user_principal =
     match
       List.filter_map principals_and_entries ~f:(fun (principal, entry) ->
         match principal with
@@ -234,7 +233,7 @@ let add_new_entry_for_all_principals ?kvno t ~password =
         | Service _ -> None)
       |> List.Assoc.sort_and_group ~compare:[%compare: Principal.Name.t]
     with
-    | [ (_, entries) ] -> return entries
+    | [ (user_principal, _) ] -> return user_principal
     | [] -> Deferred.Or_error.error_s [%message "Missing user principal in keytab."]
     | entries_and_principals ->
       let principals = List.map entries_and_principals ~f:fst in
@@ -248,7 +247,7 @@ let add_new_entry_for_all_principals ?kvno t ~password =
        the keytab and bump the kvno! *)
     latest_keys t
   in
-  let%bind () = update_user_keytab_entries t ~user_entries ~password ~kvno in
+  let%bind () = update_user_keytab_entries t ~user_principal ~enctypes ~password ~kvno in
   let%bind () =
     Deferred.Or_error.List.iter ~how:`Sequential spns ~f:(fun spn -> add_spn t spn)
   in

@@ -16,7 +16,7 @@ type t =
   ; plaintext_writer : Writer.t
   ; writer_closed_and_flushed : unit Deferred.t
   }
-[@@deriving fields]
+[@@deriving fields ~getters]
 
 let make_reader_writer info =
   (* borrowed from [Reader.of_pipe] *)

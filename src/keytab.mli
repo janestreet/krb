@@ -68,8 +68,8 @@ val add_entry
   -> principal:Principal.t
   -> unit Deferred.Or_error.t
 
-(** For each principal and enctype in the keytab, add a fresh key generated from the
-    provided password.
+(** For each principal in the keytab and encryption type in the provided set, add a fresh
+    key generated from the provided password.
     - There must not be principals with conflicting keys with the latest kvno.
     - If no kvno is provided, uses value one greater than the latest kvno found in the
       keytab. *)
@@ -77,6 +77,7 @@ val add_new_entry_for_all_principals
   :  ?kvno:int
   -> t
   -> password:string
+  -> enctypes:Internal.Enctype.Set.t
   -> unit Deferred.Or_error.t
 
 module Stable : sig

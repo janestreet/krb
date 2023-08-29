@@ -50,7 +50,7 @@ module Extendable_deferred = struct
     { defers : Elt.t Deque.t
     ; wait : unit Deferred.t
     }
-  [@@deriving fields]
+  [@@deriving fields ~getters]
 
   let create elt ~callback =
     let q = Deque.create () in

@@ -10,4 +10,4 @@ type t =
       credential forwarding with [on_credential_forwarding_request] on connection
       establishment. *)
   }
-[@@deriving fields, sexp_of]
+[@@deriving fields ~getters ~iterators:create, sexp_of]

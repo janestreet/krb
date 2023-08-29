@@ -26,7 +26,7 @@ type t =
   ; realm : string
   ; principal : string
   }
-[@@deriving fields]
+[@@deriving fields ~getters]
 
 let sexp_of_t t =
   [%sexp { realm = (t.realm : string); principal = (t.principal : string) }]

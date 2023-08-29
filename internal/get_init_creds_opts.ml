@@ -23,7 +23,7 @@ type t =
   ; forwardable : bool
   ; proxiable : bool
   }
-[@@deriving fields, sexp_of]
+[@@deriving sexp_of]
 
 let default =
   { tkt_lifetime =

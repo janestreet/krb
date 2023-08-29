@@ -21,6 +21,10 @@ val of_int : int -> t
 val to_int : t -> int
 val arg : t Command.Arg_type.t
 
+(** The set of encryption types we should be putting in keytabs. Most useful for passing
+    to [Krb.Keytab.add_new_entry_for_all_principals]. *)
+val current_for_keytabs : Set.t
+
 module Stable : sig
   module V1 : Stable with type t = t
 end

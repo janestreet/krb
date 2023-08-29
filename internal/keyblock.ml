@@ -79,7 +79,7 @@ module T = struct
       { enctype : Enctype.t
       ; key : string
       }
-    [@@deriving compare, fields, sexp_of]
+    [@@deriving compare, fields ~iterators:create, sexp_of]
   end
 
   let obs t = Obs.Fields.create ~enctype:(enctype t) ~key:(key t)

@@ -114,7 +114,7 @@ type t =
   ; full_name : Full_name.t
   ; type_ : [ `Normal | `S4U2Self of Principal.t ]
   }
-[@@deriving fields]
+[@@deriving fields ~getters]
 
 let sexp_of_t t = [%sexp { full_name = (t.full_name : Full_name.t) }]
 let compare t1 t2 = String.compare t1.full_name t2.full_name

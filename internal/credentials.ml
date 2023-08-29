@@ -86,7 +86,7 @@ type t =
   ; client : Principal.t
   ; server : Principal.t
   }
-[@@deriving fields]
+[@@deriving fields ~getters]
 
 let sexp_of_t t =
   [%sexp

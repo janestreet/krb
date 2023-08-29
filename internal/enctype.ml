@@ -96,6 +96,14 @@ let aes128_cts_hmac_sha1_96 = KRB5_ENCTYPE_AES128_CTS_HMAC_SHA1_96
 let aes256_cts_hmac_sha1_96 = KRB5_ENCTYPE_AES256_CTS_HMAC_SHA1_96
 let arcfour_hmac = KRB5_ENCTYPE_ARCFOUR_HMAC
 
+let current_for_keytabs =
+  Set.of_list
+    [ KRB5_ENCTYPE_AES128_CTS_HMAC_SHA1_96
+    ; KRB5_ENCTYPE_AES256_CTS_HMAC_SHA1_96
+    ; KRB5_ENCTYPE_ARCFOUR_HMAC
+    ]
+;;
+
 let arg =
   Command.Arg_type.of_alist_exn
     ~list_values_in_help:false

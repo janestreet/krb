@@ -25,7 +25,7 @@ module Stable = struct
         ; principal : string
         ; endpoint : Mode.t
         }
-      [@@deriving bin_io, fields]
+      [@@deriving bin_io]
     end
 
     module Client_header = struct
@@ -33,7 +33,7 @@ module Stable = struct
         { accepted_conn_types : Conn_type.V1.t list
         ; ap_request : Krb_internal_public.Auth_context.Ap_req.t
         }
-      [@@deriving bin_io, fields]
+      [@@deriving bin_io]
     end
   end
 
@@ -51,7 +51,7 @@ module Stable = struct
         ; principal : Principal.Stable.Name.V1.t
         ; endpoint : Mode.t
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, sexp]
     end
 
     module Client_header = struct
@@ -59,7 +59,7 @@ module Stable = struct
         { accepted_conn_types : Conn_type_preference.V1.t
         ; ap_request : Bigstring.V1.t
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, sexp]
     end
   end
 
@@ -78,7 +78,7 @@ module Stable = struct
         ; endpoint : Mode.t
         ; wants_forwarded_creds : bool
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, sexp]
     end
 
     module Client_header = struct
@@ -87,7 +87,7 @@ module Stable = struct
         ; ap_request : Bigstring.V1.t
         ; forward_credentials_if_requested : bool
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, sexp]
     end
   end
 
@@ -105,7 +105,7 @@ module Stable = struct
         ; principal : Principal.Stable.Name.V1.t
         ; endpoint : Mode.t
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, fields ~getters, sexp]
     end
 
     module Client_header = struct
@@ -114,7 +114,7 @@ module Stable = struct
         ; ap_request : Bigstring.V1.t
         ; forwarded_creds_ap_request : Bigstring.V1.t
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, fields ~getters, sexp]
     end
   end
 
@@ -132,7 +132,7 @@ module Stable = struct
         ; principal : Cross_realm_principal_name.Stable.V1.t
         ; endpoint : Mode.t
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, sexp]
     end
 
     module Client_header = struct
@@ -141,7 +141,7 @@ module Stable = struct
         ; ap_request : Bigstring.V1.t
         ; forwarded_creds_ap_request : Bigstring.V1.t
         }
-      [@@deriving bin_io, fields, sexp]
+      [@@deriving bin_io, sexp]
     end
   end
 end
@@ -176,7 +176,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       ; peer_principal : Cross_realm_principal_name.t
       ; protocol_version : [ `Test_mode | `Versioned of int ]
       }
-    [@@deriving fields]
+    [@@deriving fields ~getters ~iterators:create]
 
     module Cross_realm = struct
       let my_principal = my_principal
@@ -389,7 +389,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; principal : string
           ; endpoint : Mode.t
           }
-        [@@deriving bin_io, fields]
+        [@@deriving bin_io, fields ~getters ~iterators:create]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
@@ -400,7 +400,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           { accepted_conn_types : Conn_type.V1.t list
           ; ap_request : Ap_req.t
           }
-        [@@deriving bin_io, fields]
+        [@@deriving bin_io, fields ~getters ~iterators:create]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
@@ -621,7 +621,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; principal : Principal.Stable.Name.V1.t
           ; endpoint : Mode.t
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
@@ -632,7 +632,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           { accepted_conn_types : Conn_type_preference.V1.t
           ; ap_request : Bigstring.Stable.V1.t
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
@@ -860,7 +860,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; endpoint : Mode.t
           ; wants_forwarded_creds : bool
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
@@ -872,7 +872,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; ap_request : Bigstring.Stable.V1.t
           ; forward_credentials_if_requested : bool
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
@@ -1181,7 +1181,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; principal : Principal.Stable.Name.V1.t
           ; endpoint : Mode.t
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
@@ -1193,7 +1193,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; ap_request : Bigstring.Stable.V1.t
           ; forwarded_creds_ap_request : Bigstring.Stable.V1.t
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t
@@ -1468,7 +1468,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; principal : Cross_realm_principal_name.Stable.V1.t
           ; endpoint : Mode.t
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read ~backend = read_bin_prot ~backend ~name:"Server header" bin_reader_t
@@ -1480,7 +1480,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ; ap_request : Bigstring.Stable.V1.t
           ; forwarded_creds_ap_request : Bigstring.Stable.V1.t
           }
-        [@@deriving bin_io, fields, sexp]
+        [@@deriving bin_io, fields ~getters ~iterators:create, sexp]
 
         let write ~backend t = Backend.write_bin_prot_exn backend bin_writer_t t
         let read' ~backend = read_bin_prot' ~backend ~name:"Client header" bin_reader_t

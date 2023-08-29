@@ -14,7 +14,7 @@ module Reader = struct
     ; max_message_size : int
     ; mutable bytes_read : Int63.t
     }
-  [@@deriving fields, sexp_of]
+  [@@deriving sexp_of]
 
   let with_reader f t = f t.reader
   let close = with_reader Reader.close
@@ -163,7 +163,7 @@ module Writer = struct
     ; on_done_with_internal_buffer : Bigstring.t -> unit
     ; mutable bytes_written : Int63.t
     }
-  [@@deriving fields, sexp_of]
+  [@@deriving fields ~iterators:create, sexp_of]
 
   let zero_buffer buffer =
     Bigstring.memset buffer ~pos:0 ~len:(Bigstring.length buffer) '\000'

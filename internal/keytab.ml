@@ -47,7 +47,7 @@ type t =
   { raw : Raw.t
   ; path : string
   }
-[@@deriving fields]
+[@@deriving fields ~getters]
 
 let sexp_of_t t = [%sexp { path = (t.path : string Sexp_opaque_when_testing.t) }]
 let to_raw = raw

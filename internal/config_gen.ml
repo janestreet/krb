@@ -25,7 +25,7 @@ module Shared = struct
     ; verbose_errors : bool option [@sexp.option]
     ; sandboxing_state : [ `None | `Sandboxed | `Exempted ] option [@sexp.option]
     }
-  [@@deriving fields, sexp_of]
+  [@@deriving fields ~fields ~iterators:fold, sexp_of]
 
   let t_of_sexp sexp =
     let { Format.pre_v5_assumed_realm
