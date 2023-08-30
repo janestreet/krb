@@ -249,7 +249,7 @@ module Writer = struct
   ;;
 
   let send_bin_prot (type a) t (bin_writer : a Bin_prot.Type_class.writer) (value : a) =
-    
+    [%ocaml.local]
       (if is_closed t
        then Transport.Send_result.Closed
        else (
@@ -274,7 +274,7 @@ module Writer = struct
     ~pos
     ~len
     =
-    
+    [%ocaml.local]
       (if is_closed t
        then Transport.Send_result.Closed
        else (
@@ -298,7 +298,7 @@ module Writer = struct
   ;;
 
   let send_bin_prot_and_bigstring t bin_writer_t value ~buf ~pos ~len =
-    
+    [%ocaml.local]
       (match
          send_bin_prot_and_bigstring_non_copying t bin_writer_t value ~buf ~pos ~len
        with
