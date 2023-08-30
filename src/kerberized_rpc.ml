@@ -21,10 +21,10 @@ module Connection = struct
   ;;
 
   let handle_client
-        ?heartbeat_config
-        ?handshake_timeout
-        initial_connection_state
-        implementations
+    ?heartbeat_config
+    ?handshake_timeout
+    initial_connection_state
+    implementations
     =
     Kerberized_rpc_over_protocol.handle_client
       (module Async_protocol.Connection)
@@ -36,24 +36,24 @@ module Connection = struct
 
   module Internal = struct
     let serve
-          ?override_supported_versions
-          ?additional_magic_numbers
-          ?max_message_size
-          ?handshake_timeout
-          ?heartbeat_config
-          ?max_connections
-          ?backlog
-          ?drop_incoming_connections
-          ?buffer_age_limit
-          ?on_kerberos_error
-          ?(on_handshake_error = `Ignore)
-          ?on_done_with_internal_buffer
-          ~authorize
-          ~implementations
-          ~initial_connection_state
-          ~where_to_listen
-          ~krb_mode
-          ()
+      ?override_supported_versions
+      ?additional_magic_numbers
+      ?max_message_size
+      ?handshake_timeout
+      ?heartbeat_config
+      ?max_connections
+      ?backlog
+      ?drop_incoming_connections
+      ?buffer_age_limit
+      ?on_kerberos_error
+      ?(on_handshake_error = `Ignore)
+      ?on_done_with_internal_buffer
+      ~authorize
+      ~implementations
+      ~initial_connection_state
+      ~where_to_listen
+      ~krb_mode
+      ()
       =
       Kerberized_rpc_transport.Internal.Tcp.serve
         ?override_supported_versions
@@ -65,7 +65,7 @@ module Connection = struct
         ?buffer_age_limit
         ?on_kerberos_error
         ~on_handshake_error
-        (* A TCP handler error is an RPC handshake error, since the handler just does
+          (* A TCP handler error is an RPC handshake error, since the handler just does
            a handshake. *)
         ~on_handler_error:(handshake_handler_for_rpc on_handshake_error)
         ?on_done_with_internal_buffer
@@ -81,21 +81,21 @@ module Connection = struct
     ;;
 
     let client
-          ?override_supported_versions
-          ?max_message_size
-          ?(handshake_timeout =
-            Time_ns.Span.to_span_float_round_nearest
-              Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
-          ?heartbeat_config
-          ?implementations
-          ?description
-          ?cred_cache
-          ?buffer_age_limit
-          ?on_credential_forwarding_request
-          ?on_done_with_internal_buffer
-          ?krb_mode
-          ~authorize
-          where_to_connect
+      ?override_supported_versions
+      ?max_message_size
+      ?(handshake_timeout =
+        Time_ns.Span.to_span_float_round_nearest
+          Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
+      ?heartbeat_config
+      ?implementations
+      ?description
+      ?cred_cache
+      ?buffer_age_limit
+      ?on_credential_forwarding_request
+      ?on_done_with_internal_buffer
+      ?krb_mode
+      ~authorize
+      where_to_connect
       =
       let finish_handshake_by = Time.add (Time.now ()) handshake_timeout in
       Kerberized_rpc_transport.Internal.Tcp.client
@@ -130,10 +130,10 @@ module Connection = struct
   ;;
 
   let handle_client_with_anon
-        ?heartbeat_config
-        ?handshake_timeout
-        initial_connection_state
-        implementations
+    ?heartbeat_config
+    ?handshake_timeout
+    initial_connection_state
+    implementations
     =
     Kerberized_rpc_over_protocol.handle_client_with_anon
       (module Async_protocol.Connection)
@@ -144,17 +144,17 @@ module Connection = struct
   ;;
 
   let create_handler
-        ?max_message_size
-        ?handshake_timeout
-        ?heartbeat_config
-        ?on_kerberos_error
-        ?(on_handshake_error = `Ignore)
-        ?on_done_with_internal_buffer
-        ~authorize
-        ~implementations
-        ~initial_connection_state
-        ~krb_mode
-        ()
+    ?max_message_size
+    ?handshake_timeout
+    ?heartbeat_config
+    ?on_kerberos_error
+    ?(on_handshake_error = `Ignore)
+    ?on_done_with_internal_buffer
+    ~authorize
+    ~implementations
+    ~initial_connection_state
+    ~krb_mode
+    ()
     =
     Kerberized_rpc_transport.Tcp.create_handler
       ?max_message_size
@@ -173,17 +173,17 @@ module Connection = struct
   ;;
 
   let create_handler_with_anon
-        ?max_message_size
-        ?handshake_timeout
-        ?heartbeat_config
-        ?on_kerberos_error
-        ?(on_handshake_error = `Ignore)
-        ?on_done_with_internal_buffer
-        ~authorize
-        ~implementations
-        ~initial_connection_state
-        ~krb_mode
-        ()
+    ?max_message_size
+    ?handshake_timeout
+    ?heartbeat_config
+    ?on_kerberos_error
+    ?(on_handshake_error = `Ignore)
+    ?on_done_with_internal_buffer
+    ~authorize
+    ~implementations
+    ~initial_connection_state
+    ~krb_mode
+    ()
     =
     Kerberized_rpc_transport.Tcp.create_handler_with_anon
       ?max_message_size
@@ -202,22 +202,22 @@ module Connection = struct
   ;;
 
   let serve_with_anon
-        ?max_message_size
-        ?handshake_timeout
-        ?heartbeat_config
-        ?max_connections
-        ?backlog
-        ?drop_incoming_connections
-        ?buffer_age_limit
-        ?on_kerberos_error
-        ?(on_handshake_error = `Ignore)
-        ?on_done_with_internal_buffer
-        ~authorize
-        ~implementations
-        ~initial_connection_state
-        ~where_to_listen
-        ~krb_mode
-        ()
+    ?max_message_size
+    ?handshake_timeout
+    ?heartbeat_config
+    ?max_connections
+    ?backlog
+    ?drop_incoming_connections
+    ?buffer_age_limit
+    ?on_kerberos_error
+    ?(on_handshake_error = `Ignore)
+    ?on_done_with_internal_buffer
+    ~authorize
+    ~implementations
+    ~initial_connection_state
+    ~where_to_listen
+    ~krb_mode
+    ()
     =
     Kerberized_rpc_transport.Tcp.serve_with_anon
       ?max_message_size
@@ -245,19 +245,19 @@ module Connection = struct
   ;;
 
   let with_client
-        ?max_message_size
-        ?handshake_timeout
-        ?heartbeat_config
-        ?implementations
-        ?description
-        ?cred_cache
-        ?buffer_age_limit
-        ?on_credential_forwarding_request
-        ?on_done_with_internal_buffer
-        ?krb_mode
-        ~authorize
-        where_to_connect
-        f
+    ?max_message_size
+    ?handshake_timeout
+    ?heartbeat_config
+    ?implementations
+    ?description
+    ?cred_cache
+    ?buffer_age_limit
+    ?on_credential_forwarding_request
+    ?on_done_with_internal_buffer
+    ?krb_mode
+    ~authorize
+    where_to_connect
+    f
     =
     client
       ?max_message_size
@@ -273,9 +273,7 @@ module Connection = struct
       ~authorize
       where_to_connect
     >>=? fun t ->
-    Deferred.Or_error.try_with
-      ~run:`Schedule
-      (fun () -> f t)
+    Deferred.Or_error.try_with ~run:`Schedule (fun () -> f t)
     >>= fun result -> Rpc.Connection.close t >>| fun () -> result
   ;;
 end
@@ -283,11 +281,11 @@ end
 let%test_module "Ensure test mode works" =
   (module struct
     let serve
-          ~implementations
-          ~initial_connection_state
-          ~where_to_listen
-          ~krb_mode
-          ~authorize
+      ~implementations
+      ~initial_connection_state
+      ~where_to_listen
+      ~krb_mode
+      ~authorize
       =
       Connection.serve
         ~implementations

@@ -4,7 +4,7 @@ open Import
 
 type 'a with_krb_args =
   ?cred_cache:Cred_cache.t
-  (** This defaults to [Cred_cache.default] for a [TGT] key source and a new MEMORY cache
+    (** This defaults to [Cred_cache.default] for a [TGT] key source and a new MEMORY cache
       for a [Keytab] key source. *)
   -> ?krb_mode:Mode.Client.t (** This defaults to [Mode.Client.kerberized ()] *)
   -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
@@ -12,13 +12,13 @@ type 'a with_krb_args =
 
 type 'a with_connect_args =
   (Socket.Address.Inet.t Tcp.Where_to_connect.t -> 'a) with_krb_args
-    Tcp.Aliases.with_connect_options
+  Tcp.Aliases.with_connect_options
 
 val connect : (Kerberized_rw.t * Server_principal.t) Deferred.Or_error.t with_connect_args
 
 val with_connection
   : ((Kerberized_rw.t -> Server_principal.t -> 'a Deferred.t) -> 'a Deferred.Or_error.t)
-      with_connect_args
+    with_connect_args
 
 (** Arguments passed through to [Tcp.Server.create].  See [Async.Tcp] for documentation *)
 type 'a async_tcp_server_args =
@@ -31,23 +31,21 @@ type 'a async_tcp_server_args =
 module Server : sig
   type ('a, 'b) t = ('a, 'b) Tcp.Server.t
 
-
-
   (** Create a TCP server. Unlike an un-kerberized TCP server, this will read and write
       some bytes from/to the underlying socket before returning a [t]. *)
   val create
     : (?on_kerberos_error:
-        [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
-       (** [on_kerberos_error] gets called for some kerberos related errors that occur
+         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+         (** [on_kerberos_error] gets called for some kerberos related errors that occur
            during setup of a connection. This includes failure to de/encrypt messages
            during the setup phase, invalid service tickets sent by the client, etc. It
            defaults to logging via [Log.Global.error]. *)
        -> ?on_handshake_error:
-         [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
-         | `Ignore
-         | `Raise
-         ]
-       (** [on_handshake_error] gets called for any non-kerberos related errors that occur
+            [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
+            | `Ignore
+            | `Raise
+            ]
+            (** [on_handshake_error] gets called for any non-kerberos related errors that occur
            during setup of a connection. This includes connectivity errors and version
            negotiation errors (which includes kerberos mode mismatch between client and
            server).
@@ -61,13 +59,13 @@ module Server : sig
            It may also be triggered by network gremlins: https://wiki/x/34H1Bw.
        *)
        -> ?on_handler_error:
-         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
-       (** [on_handler_error] gets called for any errors that occur within the handler
+            [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+            (** [on_handler_error] gets called for any errors that occur within the handler
            function passed into [Server.create]. This includes any exceptions raised by the
            handler function as well as errors in de/encrypting messages. It defaults to
            [`Raise]. *)
        -> ?override_supported_versions:int list
-       (** [override_supported_versions] overrides the versions the server
+            (** [override_supported_versions] overrides the versions the server
            advertises and accepts. This should only be used in a testing context,
            otherwise krb version negotiation might yield a weird result. *)
        -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
@@ -79,7 +77,7 @@ module Server : sig
            -> Writer.t
            -> unit Deferred.t)
        -> (Socket.Address.Inet.t, int) t Deferred.Or_error.t)
-        async_tcp_server_args
+      async_tcp_server_args
 end
 
 module Internal : sig
@@ -90,16 +88,16 @@ module Internal : sig
        -> authorize:Authorize.t
        -> Socket.Address.Inet.t Tcp.Where_to_connect.t
        -> Async_protocol.Connection.t Deferred.Or_error.t)
-        Tcp.Aliases.with_connect_options
+      Tcp.Aliases.with_connect_options
 
   module Endpoint : sig
     val create
       :  Server_key_source.t
       -> (Principal.t
-          * (unit
-             -> [ `Service of Keytab.t | `User_to_user_via_tgt of Internal.Credentials.t ]
-                  Deferred.Or_error.t))
-           Deferred.Or_error.t
+         * (unit
+            -> [ `Service of Keytab.t | `User_to_user_via_tgt of Internal.Credentials.t ]
+               Deferred.Or_error.t))
+         Deferred.Or_error.t
   end
 
   module Server : sig
@@ -124,17 +122,17 @@ module Internal : sig
     type ('authorize, 'connection) serve :=
       ( 'authorize
       , Tcp.Where_to_listen.inet
-      -> 'connection handle_client
-      -> (Socket.Address.Inet.t, int) Server.t Deferred.Or_error.t )
-        krb_args
-        async_tcp_server_args
+        -> 'connection handle_client
+        -> (Socket.Address.Inet.t, int) Server.t Deferred.Or_error.t )
+      krb_args
+      async_tcp_server_args
 
     type ('authorize, 'connection) create_handler :=
       ( 'authorize
       , 'connection handle_client
-      -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
+        -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
            Deferred.Or_error.t )
-        krb_args
+      krb_args
 
     (** [additional_magic_numbers] adds additional magic numbers to be
         advertised by the server during protocol negotiation, usually in

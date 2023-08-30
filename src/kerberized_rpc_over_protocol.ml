@@ -5,22 +5,17 @@ open! Import
 let collect_errors writer_monitor ~f =
   choose
     [ choice (Monitor.detach_and_get_next_error writer_monitor) (fun e -> Error e)
-    ; choice
-        (try_with
-           ~run:`Schedule
-           ~name:"Rpc.Connection.collect_errors"
-           f)
-        Fn.id
+    ; choice (try_with ~run:`Schedule ~name:"Rpc.Connection.collect_errors" f) Fn.id
     ]
 ;;
 
 let create_connection_collect_errors_and_close_exn
-      ~implementations
-      ~connection_state
-      ~description
-      ?handshake_timeout
-      ?heartbeat_config
-      (transport : Rpc.Transport.t)
+  ~implementations
+  ~connection_state
+  ~description
+  ?handshake_timeout
+  ?heartbeat_config
+  (transport : Rpc.Transport.t)
   =
   let writer_monitor = Rpc.Transport.Writer.monitor transport.writer in
   collect_errors writer_monitor ~f:(fun () ->
@@ -44,12 +39,12 @@ let create_connection_collect_errors_and_close_exn
 ;;
 
 let handle_client
-      (type conn)
-      (module Connection : Protocol.Connection with type t = conn)
-      ?heartbeat_config
-      ?handshake_timeout
-      initial_connection_state
-      implementations
+  (type conn)
+  (module Connection : Protocol.Connection with type t = conn)
+  ?heartbeat_config
+  ?handshake_timeout
+  initial_connection_state
+  implementations
   =
   Staged.stage (fun client_address (transport : Rpc.Transport.t) conn ->
     let request_forwarded_creds rpc_connection () =
@@ -84,12 +79,12 @@ let handle_client
 ;;
 
 let handle_client_with_anon
-      (type conn)
-      (module Connection : Protocol_intf.Connection with type t = conn)
-      ?heartbeat_config
-      ?handshake_timeout
-      initial_connection_state
-      implementations
+  (type conn)
+  (module Connection : Protocol_intf.Connection with type t = conn)
+  ?heartbeat_config
+  ?handshake_timeout
+  initial_connection_state
+  implementations
   =
   let handle_krb_client =
     let initial_connection_state client_identity =
@@ -125,16 +120,16 @@ let handle_client_with_anon
 ;;
 
 let client
-      (type conn)
-      (module Connection : Protocol_intf.Connection with type t = conn)
-      ?heartbeat_config
-      ?implementations
-      ?description
-      ?(on_credential_forwarding_request = Fn.const On_credential_forwarding_request.Deny)
-      ~finish_handshake_by
-      where_to_connect
-      transport
-      conn
+  (type conn)
+  (module Connection : Protocol_intf.Connection with type t = conn)
+  ?heartbeat_config
+  ?implementations
+  ?description
+  ?(on_credential_forwarding_request = Fn.const On_credential_forwarding_request.Deny)
+  ~finish_handshake_by
+  where_to_connect
+  transport
+  conn
   =
   let server_principal = Connection.peer_principal conn in
   let client_principal = Connection.my_principal conn in
@@ -259,9 +254,9 @@ module For_testing = struct
         ~authorize:
           (Authorize.create (fun (`Inet (client_host, _client_port)) client_principal ->
              if [%compare.equal: Principal.Name.t] client client_principal
-             && [%compare.equal: Unix.Inet_addr.t]
-                  client_host
-                  (Unix.Inet_addr.of_string host)
+                && [%compare.equal: Unix.Inet_addr.t]
+                     client_host
+                     (Unix.Inet_addr.of_string host)
              then `Accept
              else `Reject))
       >>= fun server ->
@@ -271,18 +266,18 @@ module For_testing = struct
           ~authorize:
             (Authorize.create (fun server_address server_principal ->
                if [%compare.equal: Principal.Name.t] service server_principal
-               && [%compare.equal: Socket.Address.Inet.t]
-                    server_address
-                    (Socket.Address.Inet.create (Unix.Inet_addr.of_string host) ~port)
+                  && [%compare.equal: Socket.Address.Inet.t]
+                       server_address
+                       (Socket.Address.Inet.create (Unix.Inet_addr.of_string host) ~port)
                then `Accept
                else `Reject))
           ~krb_mode
           (Tcp.Where_to_connect.of_host_and_port { host; port })
           (fun connection ->
-             Rpc.Rpc.dispatch_exn Test_rpc.rpc connection Test_rpc.test_query
-             >>| function
-             | Thank_you_very_much principal ->
-               [%test_result: Principal.Name.t] principal ~expect)
+            Rpc.Rpc.dispatch_exn Test_rpc.rpc connection Test_rpc.test_query
+            >>| function
+            | Thank_you_very_much principal ->
+              [%test_result: Principal.Name.t] principal ~expect)
         >>| ok_exn
       in
       test_with_client ~krb_mode:(Mode.Test_with_principal client) ~expect:client)

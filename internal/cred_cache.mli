@@ -72,7 +72,6 @@ val get_cached_tgt
   -> t
   -> Credentials.t Deferred.Or_error.t
 
-
 val renew : t -> Credentials.t -> Credentials.t Deferred.Or_error.t
 
 module Expert : sig

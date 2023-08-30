@@ -66,10 +66,10 @@ let%test "is_as_strong" =
     [ (* Priv is strongest *)
       is_as_strong Priv ~as_:Auth
     ; is_as_strong Priv ~as_:Safe
-      ; (* Auth is weakest *)
+    ; (* Auth is weakest *)
       is_not_as_strong Auth ~as_:Safe
     ; is_not_as_strong Auth ~as_:Priv
-      ; (* Safe is in between *)
+    ; (* Safe is in between *)
       is_as_strong Safe ~as_:Auth
     ; is_not_as_strong Safe ~as_:Priv
     ]

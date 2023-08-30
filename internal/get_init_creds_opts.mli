@@ -10,7 +10,7 @@ type t
 val create
   :  ?tkt_lifetime:Time_float.Span.t (** default: 10h *)
   -> ?renew_lifetime:Time_float.Span.t
-  (** default: 365d (but most likely shortened by KDC) *)
+       (** default: 365d (but most likely shortened by KDC) *)
   -> ?forwardable:bool (** default: true *)
   -> ?proxiable:bool (** default: false *)
   -> unit

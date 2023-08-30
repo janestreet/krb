@@ -1,7 +1,6 @@
 open! Core
 open Async
 
-
 type t = Context.t Throttle.Sequencer.t
 
 let the_t : t Lazy_deferred.t =
@@ -27,30 +26,28 @@ let the_t : t Lazy_deferred.t =
     let%map t =
       In_thread.run Context.init
       >>| (fun result ->
-        Ivar.fill_exn context_initialized ();
-        result)
+            Ivar.fill_exn context_initialized ();
+            result)
       >>| Result.map_error ~f:(fun code ->
-        let krb_error = Krb_error.to_string ~info:"krb5_init_context" code in
-        match Krb_info.sandbox_tag with
-        | Some tag ->
-          Error.create_s
-            [%message
-              "Failed to initialize global Krb context"
-                ~_:(krb_error : string)
-                (code : int32)
-                (tag : Sexp.t)]
-        | None ->
-          Error.create_s
-            [%message
-              "Failed to initialize global Krb context"
-                ~_:(krb_error : string)
-                (code : int32)])
+            let krb_error = Krb_error.to_string ~info:"krb5_init_context" code in
+            match Krb_info.sandbox_tag with
+            | Some tag ->
+              Error.create_s
+                [%message
+                  "Failed to initialize global Krb context"
+                    ~_:(krb_error : string)
+                    (code : int32)
+                    (tag : Sexp.t)]
+            | None ->
+              Error.create_s
+                [%message
+                  "Failed to initialize global Krb context"
+                    ~_:(krb_error : string)
+                    (code : int32)])
       >>| ok_exn
       >>| Throttle.Sequencer.create
     in
-    Shutdown.at_shutdown (fun () ->
-      Throttle.prior_jobs_done t
-      );
+    Shutdown.at_shutdown (fun () -> Throttle.prior_jobs_done t);
     t)
 ;;
 
@@ -160,8 +157,8 @@ let enqueue_job_with_info' ~info ~f =
 let enqueue_job_with_info ~info ~f =
   enqueue_job_with_info' ~info ~f
   |> Deferred.Result.map_error ~f:(function
-    | `Raised error -> error
-    | `Krb_error (error, _code) -> error)
+       | `Raised error -> error
+       | `Krb_error (error, _code) -> error)
 ;;
 
 let add_finalizer arg ~f:finalize =
@@ -184,8 +181,8 @@ module Expert = struct
       ~is_blocking:true
       ~f:(fun c -> return (f c))
     |> Deferred.Result.map_error ~f:(function
-      | `Raised error -> error
-      | `Krb_error (error, _code) -> error)
+         | `Raised error -> error
+         | `Krb_error (error, _code) -> error)
   ;;
 end
 

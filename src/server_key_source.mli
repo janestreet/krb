@@ -15,14 +15,13 @@ open! Async
 
 type t =
   | Tgt
-  (** Use the session key associated with the server's ticket granting ticket (TGT). The
+      (** Use the session key associated with the server's ticket granting ticket (TGT). The
       user must have a valid TGT in its cred cache. This is the recommended setup for
       human users that don't have keytabs. *)
   | Keytab of Principal.Name.t * Keytab.Path.t
-  (** Use the password-derived key for the specified principal that is stored in the
+      (** Use the password-derived key for the specified principal that is stored in the
       specified keytab. *)
 [@@deriving compare, hash, sexp_of]
-
 
 (** Make a best effort attempt to validate [t]. This can be used as a way to fail early
     after getting a [t] from the command line. It is automatically called with

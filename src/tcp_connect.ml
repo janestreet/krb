@@ -2,12 +2,12 @@ open! Core
 open! Async
 
 let connect_and_handshake'
-      ?time_source
-      ~timeout
-      ~connect
-      ~handshake
-      ~on_handshake_error
-      ()
+  ?time_source
+  ~timeout
+  ~connect
+  ~handshake
+  ~on_handshake_error
+  ()
   =
   let time_source =
     match time_source with
@@ -49,16 +49,16 @@ let close_connection_via_reader_and_writer reader writer =
 ;;
 
 let connect_and_handshake
-      ?buffer_age_limit
-      ?interrupt
-      ?reader_buffer_size
-      ?writer_buffer_size
-      ?(timeout =
-        Time_ns.Span.to_span_float_round_nearest
-          Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
-      ?time_source
-      where_to_connect
-      ~handshake
+  ?buffer_age_limit
+  ?interrupt
+  ?reader_buffer_size
+  ?writer_buffer_size
+  ?(timeout =
+    Time_ns.Span.to_span_float_round_nearest
+      Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
+  ?time_source
+  where_to_connect
+  ~handshake
   =
   connect_and_handshake'
     ?time_source
@@ -80,13 +80,13 @@ let connect_and_handshake
 ;;
 
 let connect_sock_and_handshake
-      ?interrupt
-      ?(timeout =
-        Time_ns.Span.to_span_float_round_nearest
-          Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
-      ?time_source
-      where_to_connect
-      ~handshake
+  ?interrupt
+  ?(timeout =
+    Time_ns.Span.to_span_float_round_nearest
+      Async_rpc_kernel.Async_rpc_kernel_private.default_handshake_timeout)
+  ?time_source
+  where_to_connect
+  ~handshake
   =
   let open Deferred.Or_error.Let_syntax in
   connect_and_handshake'

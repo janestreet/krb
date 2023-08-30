@@ -51,8 +51,8 @@ module Stable : sig
 
     include
       Comparable.V1.S
-      with type comparable := t
-      with type comparator_witness := comparator_witness
+        with type comparable := t
+        with type comparator_witness := comparator_witness
   end
 end
 

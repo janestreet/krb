@@ -266,13 +266,13 @@ module Writer = struct
 
   (* We always need to copy the inputs to be able to pass them to [encode]. *)
   let send_bin_prot_and_bigstring_non_copying
-        (type a)
-        t
-        (bin_writer : a Bin_prot.Type_class.writer)
-        (value : a)
-        ~buf
-        ~pos
-        ~len
+    (type a)
+    t
+    (bin_writer : a Bin_prot.Type_class.writer)
+    (value : a)
+    ~buf
+    ~pos
+    ~len
     =
     
       (if is_closed t
@@ -379,9 +379,9 @@ let effective_max_message_size ~proposed_max =
 ;;
 
 let of_connection
-      ?(on_done_with_internal_buffer = `Do_nothing)
-      ?max_message_size:proposed_max
-      connection
+  ?(on_done_with_internal_buffer = `Do_nothing)
+  ?max_message_size:proposed_max
+  connection
   =
   let max_message_size = effective_max_message_size ~proposed_max in
   if max_message_size < 0
@@ -473,21 +473,21 @@ module Tcp = struct
   ;;
 
   let serve_internal
-        ?override_supported_versions
-        ?additional_magic_numbers
-        ?max_message_size
-        ?max_connections
-        ?backlog
-        ?drop_incoming_connections
-        ?buffer_age_limit
-        ?on_kerberos_error
-        ?on_handshake_error
-        ?on_handler_error
-        ?on_done_with_internal_buffer
-        ~authorize
-        ~where_to_listen
-        ~krb_mode
-        handle_client
+    ?override_supported_versions
+    ?additional_magic_numbers
+    ?max_message_size
+    ?max_connections
+    ?backlog
+    ?drop_incoming_connections
+    ?buffer_age_limit
+    ?on_kerberos_error
+    ?on_handshake_error
+    ?on_handler_error
+    ?on_done_with_internal_buffer
+    ~authorize
+    ~where_to_listen
+    ~krb_mode
+    handle_client
     =
     Kerberized_tcp.Internal.Server.create
       ?max_connections
@@ -507,20 +507,20 @@ module Tcp = struct
   ;;
 
   let serve_with_anon_internal
-        ?override_supported_versions
-        ?max_message_size
-        ?max_connections
-        ?backlog
-        ?drop_incoming_connections
-        ?buffer_age_limit
-        ?on_kerberos_error
-        ?on_handshake_error
-        ?on_handler_error
-        ?on_done_with_internal_buffer
-        ~authorize
-        ~where_to_listen
-        ~krb_mode
-        handle_client
+    ?override_supported_versions
+    ?max_message_size
+    ?max_connections
+    ?backlog
+    ?drop_incoming_connections
+    ?buffer_age_limit
+    ?on_kerberos_error
+    ?on_handshake_error
+    ?on_handler_error
+    ?on_done_with_internal_buffer
+    ~authorize
+    ~where_to_listen
+    ~krb_mode
+    handle_client
     =
     let handle_krb_client =
       handle_krb_client
@@ -545,21 +545,21 @@ module Tcp = struct
       ~krb_mode
       where_to_listen
       (fun addr connection ->
-         match (connection : Kerberized_tcp.Internal.Server.Krb_or_anon_conn.t) with
-         | Krb connection -> handle_krb_client addr connection
-         | Anon connection -> handle_rpc_client addr connection)
+      match (connection : Kerberized_tcp.Internal.Server.Krb_or_anon_conn.t) with
+      | Krb connection -> handle_krb_client addr connection
+      | Anon connection -> handle_rpc_client addr connection)
   ;;
 
   let create_handler_internal
-        ?override_supported_versions
-        ?max_message_size
-        ?on_kerberos_error
-        ?on_handshake_error
-        ?on_handler_error
-        ?on_done_with_internal_buffer
-        ~authorize
-        ~krb_mode
-        handle_client
+    ?override_supported_versions
+    ?max_message_size
+    ?on_kerberos_error
+    ?on_handshake_error
+    ?on_handler_error
+    ?on_done_with_internal_buffer
+    ~authorize
+    ~krb_mode
+    handle_client
     =
     Kerberized_tcp.Internal.Server.create_handler
       ?override_supported_versions
@@ -573,15 +573,15 @@ module Tcp = struct
   ;;
 
   let create_handler_with_anon_internal
-        ?override_supported_versions
-        ?max_message_size
-        ?on_kerberos_error
-        ?on_handshake_error
-        ?on_handler_error
-        ?on_done_with_internal_buffer
-        ~authorize
-        ~krb_mode
-        handle_client
+    ?override_supported_versions
+    ?max_message_size
+    ?on_kerberos_error
+    ?on_handshake_error
+    ?on_handler_error
+    ?on_done_with_internal_buffer
+    ~authorize
+    ~krb_mode
+    handle_client
     =
     let handle_krb_client =
       handle_krb_client
@@ -601,21 +601,21 @@ module Tcp = struct
       ~authorize
       ~krb_mode
       (fun addr connection ->
-         match (connection : Kerberized_tcp.Internal.Server.Krb_or_anon_conn.t) with
-         | Krb connection -> handle_krb_client addr connection
-         | Anon connection -> handle_rpc_client addr connection)
+      match (connection : Kerberized_tcp.Internal.Server.Krb_or_anon_conn.t) with
+      | Krb connection -> handle_krb_client addr connection
+      | Anon connection -> handle_rpc_client addr connection)
   ;;
 
   let client_internal
-        ?override_supported_versions
-        ?max_message_size
-        ?timeout
-        ?cred_cache
-        ?buffer_age_limit
-        ?on_done_with_internal_buffer
-        ?krb_mode
-        ~authorize
-        where_to_connect
+    ?override_supported_versions
+    ?max_message_size
+    ?timeout
+    ?cred_cache
+    ?buffer_age_limit
+    ?on_done_with_internal_buffer
+    ?krb_mode
+    ~authorize
+    where_to_connect
     =
     let krb_mode =
       match krb_mode with

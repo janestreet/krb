@@ -28,23 +28,22 @@ type t =
 let default =
   { tkt_lifetime =
       Time_float.Span.of_hr 10.
-  (* setting renew_lifetime leads to the KDC issuing renewable tickets. By specifying a
+      (* setting renew_lifetime leads to the KDC issuing renewable tickets. By specifying a
      very long renew_lifetime, we get tickets with the max allowed renew time. By always
      obtaining a renewable TGT, we ensure that all service tickets acquired via that TGT
      are also renewable. *)
   ; renew_lifetime = Time_float.Span.of_day 365.
-  ; forwardable =
-      true
+  ; forwardable = true
   ; proxiable = false
   }
 ;;
 
 let create
-      ?(tkt_lifetime = default.tkt_lifetime)
-      ?(renew_lifetime = default.renew_lifetime)
-      ?(forwardable = default.forwardable)
-      ?(proxiable = default.proxiable)
-      ()
+  ?(tkt_lifetime = default.tkt_lifetime)
+  ?(renew_lifetime = default.renew_lifetime)
+  ?(forwardable = default.forwardable)
+  ?(proxiable = default.proxiable)
+  ()
   =
   { tkt_lifetime; renew_lifetime; forwardable; proxiable }
 ;;

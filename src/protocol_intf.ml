@@ -51,7 +51,7 @@ type 'conn serve_res =
   ( 'conn
   , [ `Krb_error of Error.t | `Handshake_error of Handshake_error.t | `Rejected_client ]
   )
-    Deferred.Result.t
+  Deferred.Result.t
 
 module type S = sig
   type protocol_backend

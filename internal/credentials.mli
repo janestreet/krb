@@ -8,7 +8,6 @@ open Async
     is needed for client/server communication. *)
 type t [@@deriving sexp_of]
 
-
 (** From RFC 4120, a [ticket] is:
 
     "A record that helps a client authenticate itself to a server; it contains the client's
@@ -37,7 +36,6 @@ val create
   -> unit
   -> t Deferred.Or_error.t
 
-
 (** [of_password] and [of_keytab] request tickets from the KDC.
 
     [options] is used to override default lifetimes and flags for the returned ticket.
@@ -60,7 +58,6 @@ val of_keytab
   -> Keytab.t
   -> t Deferred.Or_error.t
 
-
 (** [check_password principal ~password] checks with the KDC that [principal]'s password
     is [password] *)
 val check_password : Principal.t -> password:string -> unit Deferred.Or_error.t
@@ -74,8 +71,6 @@ val is_skey : t -> bool
 
 val ticket : t -> Ticket.t Deferred.Or_error.t
 val ticket_string : t -> string
-
-
 val second_ticket : t -> string
 val starttime : t -> Time_float.t
 

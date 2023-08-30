@@ -30,6 +30,6 @@ module type Test_mode_protocol = sig
 
   module Make (Backend : Protocol_backend_intf.S) :
     S
-    with type protocol_backend = Backend.t
-     and type Connection.t = Protocol.Make(Backend).Connection.t
+      with type protocol_backend = Backend.t
+       and type Connection.t = Protocol.Make(Backend).Connection.t
 end

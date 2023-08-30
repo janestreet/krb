@@ -1,4 +1,3 @@
-
 (** Hardcoded constants that affect the behavior of the Krb library.
 
     These can be changed by setting an environment variable, [OCAML_KRB_CONFIG], to a sexp

@@ -82,7 +82,7 @@ end
 
 let renewal_jobs
   : ([ `Wait of unit Or_error.t Ivar.t | `Renewing ] * Extendable_deferred.t)
-      Renewal_key.Table.t
+  Renewal_key.Table.t
   =
   Renewal_key.Table.create ~size:0 ()
 ;;
@@ -138,21 +138,21 @@ let keep_valid_loop ~renewal_key ~refresh_every ~on_error ~aborted =
       let valid_for_at_least = Time.Span.(refresh_every + of_min 2.) in
       ensure_valid ?keytab ?server_cred_cache ~cred_cache ~valid_for_at_least principal
       >>= (function
-        | Error error ->
-          Debug.log_s (fun () ->
-            [%message
-              "Error renewing Kerberos credentials"
-                (error : Error.t)
-                ~_:(renewal_key : Renewal_key.t)]);
-          handle_on_error on_error error;
-          loop ~last_failed:() ()
-        | Ok () ->
-          Debug.log_s (fun () ->
-            [%message
-              "Ensured Kerberos credentials valid"
-                (valid_for_at_least : Time.Span.t)
-                ~_:(renewal_key : Renewal_key.t)]);
-          loop ())
+      | Error error ->
+        Debug.log_s (fun () ->
+          [%message
+            "Error renewing Kerberos credentials"
+              (error : Error.t)
+              ~_:(renewal_key : Renewal_key.t)]);
+        handle_on_error on_error error;
+        loop ~last_failed:() ()
+      | Ok () ->
+        Debug.log_s (fun () ->
+          [%message
+            "Ensured Kerberos credentials valid"
+              (valid_for_at_least : Time.Span.t)
+              ~_:(renewal_key : Renewal_key.t)]);
+        loop ())
   in
   loop ()
 ;;
@@ -160,21 +160,21 @@ let keep_valid_loop ~renewal_key ~refresh_every ~on_error ~aborted =
 let default_on_error ~renewal_key =
   `Call
     (fun error ->
-       Log.Global.error_s
-         [%message
-           "Error renewing Kerberos credentials"
-             (renewal_key : Renewal_key.t)
-             (error : Error.t)])
+      Log.Global.error_s
+        [%message
+          "Error renewing Kerberos credentials"
+            (renewal_key : Renewal_key.t)
+            (error : Error.t)])
 ;;
 
 let keep_valid
-      ?(refresh_every = default_refresh_every)
-      ?on_error
-      ?keytab
-      ?server_cred_cache
-      ?abort
-      ~cred_cache
-      principal
+  ?(refresh_every = default_refresh_every)
+  ?on_error
+  ?keytab
+  ?server_cred_cache
+  ?abort
+  ~cred_cache
+  principal
   =
   let%bind.Deferred.Or_error () =
     match keytab, server_cred_cache, Internal.Cred_cache.type_ cred_cache with

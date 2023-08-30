@@ -15,7 +15,7 @@ open! Core
 type 'a mode =
   | Kerberized of 'a (** The connection will be kerberized. *)
   | Test_with_principal of Principal.Name.t
-  (** In test mode, clients/servers can pretend to be any principal. Please note that this
+      (** In test mode, clients/servers can pretend to be any principal. Please note that this
       mode provides NO Kerberos protection. The connection will be plain TCP. *)
 [@@deriving compare, hash, sexp_of]
 

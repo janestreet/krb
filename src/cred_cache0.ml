@@ -96,9 +96,9 @@ let initialize_in_memory_with_creds_from original_cache =
 
 module Expert = struct
   let in_memory_for_principal_with_s4u2self_cred'
-        ?client_cred_cache
-        ?server_cred_cache
-        client_principal
+    ?client_cred_cache
+    ?server_cred_cache
+    client_principal
     =
     let%bind () =
       match Option.map client_cred_cache ~f:Internal.Cred_cache.type_ with

@@ -107,9 +107,9 @@ module Cross_realm = struct
   ;;
 
   let initialize_in_new_cred_cache
-        ?(cache_type = Cache_type.MEMORY)
-        ?keytab
-        principal_name
+    ?(cache_type = Cache_type.MEMORY)
+    ?keytab
+    principal_name
     =
     Principal.Cross_realm.create principal_name
     >>=? fun principal ->

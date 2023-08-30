@@ -75,31 +75,31 @@ let remove_entry t entry =
 ;;
 
 module Keytab_cursor = Cursor.Make (struct
-    module Container = struct
-      type raw = Raw.t
-      type nonrec t = t [@@deriving sexp_of]
+  module Container = struct
+    type raw = Raw.t
+    type nonrec t = t [@@deriving sexp_of]
 
-      let tag t = [%message "" ~keytab:(t : t)]
-      let to_raw = to_raw
-    end
+    let tag t = [%message "" ~keytab:(t : t)]
+    let to_raw = to_raw
+  end
 
-    module Item = struct
-      type raw = Keytab_entry.t
-      type t = raw
+  module Item = struct
+    type raw = Keytab_entry.t
+    type t = raw
 
-      let of_raw = Deferred.Or_error.return
-      let free = Keytab_entry.Raw.free
-    end
+    let of_raw = Deferred.Or_error.return
+    let free = Keytab_entry.Raw.free
+  end
 
-    module Cursor = struct
-      type t = Raw.Cursor.t
+  module Cursor = struct
+    type t = Raw.Cursor.t
 
-      let start = Raw.Cursor.create
-      let advance = Raw.Cursor.advance
-      let finish = Raw.Cursor.free
-    end
+    let start = Raw.Cursor.create
+    let advance = Raw.Cursor.advance
+    let finish = Raw.Cursor.free
+  end
 
-    let info = "[krb5_kt_start_seq_get//krb5_kt_next_entry//krb5_kt_end_seq_get]"
-  end)
+  let info = "[krb5_kt_start_seq_get//krb5_kt_next_entry//krb5_kt_end_seq_get]"
+end)
 
 let entries t = Keytab_cursor.get_all t

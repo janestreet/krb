@@ -44,8 +44,8 @@ val get_credentials
   -> t
   -> request:Internal.Credentials.t
   -> (Internal.Credentials.t
-      * [ `Error_getting_creds_from_default_cache of Error.t option ])
-       Deferred.Or_error.t
+     * [ `Error_getting_creds_from_default_cache of Error.t option ])
+     Deferred.Or_error.t
 
 module For_testing : sig
   val create

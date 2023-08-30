@@ -21,7 +21,7 @@ val num_active_renewal_jobs : unit -> int
 val keep_valid
   :  ?refresh_every:Time.Span.t (** default: 30m *)
   -> ?on_error:[ `Ignore | `Raise | `Call of Error.t -> unit ]
-  (** default: call [Log.Global.error] *)
+       (** default: call [Log.Global.error] *)
   -> ?keytab:Keytab.Path.t
   -> ?server_cred_cache:t
   -> ?abort:unit Deferred.t

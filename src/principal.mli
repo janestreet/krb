@@ -2,7 +2,6 @@ open! Core
 open Async
 open Import
 
-
 (** A principal is a unique identity to which kerberos can assign tickets. Generally,
     principals are a name (containing an arbitrary number of components
     separated by '/') followed by "@<REALM>".  The [Krb] library allows for two
@@ -36,7 +35,6 @@ module Name : sig
         ; hostname : string
         }
   [@@deriving compare, hash, sexp_of]
-
 
   (** [to_string] returns either <username> or <service>/<hostname>.
 
@@ -83,7 +81,6 @@ module Cross_realm : sig
   val name : t -> Cross_realm_principal_name.t
 end
 
-
 val to_string : t -> string
 val check_password : t -> password:string -> unit Deferred.Or_error.t
 
@@ -98,9 +95,8 @@ module Stable : sig
 
       include
         Comparable.Stable.V1.With_stable_witness.S
-        with type comparable := Name.t
-        with type comparator_witness = Name.comparator_witness
+          with type comparable := Name.t
+          with type comparator_witness = Name.comparator_witness
     end
   end
 end
-

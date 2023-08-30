@@ -1,7 +1,6 @@
 open! Core
 open! Async
 
-
 (** A kerberized reader writer pair wraps up an underlying reader writer pair with
     additional logic according to the [Conn_type.t] with which it is created:
 

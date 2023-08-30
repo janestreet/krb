@@ -41,7 +41,6 @@ module V0 : sig
         supplied cred cache. Then create a KRB_AP_REQ with the obtained credentials. *)
     val init : (t * Ap_req.t) Deferred.Or_error.t with_inets with_init_args
 
-
     val init_without_addrs : Ap_req.t Deferred.Or_error.t with_init_args
   end
 

@@ -12,5 +12,5 @@ end
 
 include
   Protocol_with_test_mode_intf.S
-  with type protocol_backend := Protocol_backend_async.t
-   and module Connection := Connection
+    with type protocol_backend := Protocol_backend_async.t
+     and module Connection := Connection

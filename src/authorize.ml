@@ -2,7 +2,6 @@ open! Core
 open! Async
 open! Import
 
-
 type 'principal authorize =
   Socket.Address.Inet.t -> 'principal -> [ `Accept | `Reject ] Deferred.t
 

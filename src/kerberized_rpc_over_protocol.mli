@@ -21,7 +21,7 @@ val handle_client_with_anon
   -> (Client_identity.t option -> Socket.Address.Inet.t -> Rpc.Connection.t -> 'a)
   -> 'a Rpc.Implementations.t
   -> (Socket.Address.Inet.t -> Rpc.Transport.t -> 'conn option -> unit Deferred.t)
-       Staged.t
+     Staged.t
 
 val client
   :  (module Protocol.Connection with type t = 'conn)

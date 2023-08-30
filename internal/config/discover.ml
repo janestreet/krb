@@ -8,7 +8,7 @@ let () =
       configurator
       |> Configurator.Pkg_config.get
       |> Option.map ~f:(fun pkg_config ->
-        Configurator.Pkg_config.query pkg_config ~package:"krb5")
+           Configurator.Pkg_config.query pkg_config ~package:"krb5")
       |> Option.join
       |> Option.value ~default:{ Configurator.Pkg_config.libs = []; cflags = [] }
     in

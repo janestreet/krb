@@ -130,32 +130,32 @@ let of_raw ?(type_ = `Normal) raw =
 ;;
 
 module Cred_cache_cursor = Cursor.Make (struct
-    module Container = struct
-      type raw = Raw.t
-      type nonrec t = t [@@deriving sexp_of]
+  module Container = struct
+    type raw = Raw.t
+    type nonrec t = t [@@deriving sexp_of]
 
-      let tag t = [%message "" ~cred_cache:(t : t)]
-      let to_raw = to_raw
-    end
+    let tag t = [%message "" ~cred_cache:(t : t)]
+    let to_raw = to_raw
+  end
 
-    module Item = struct
-      type raw = Credentials.Raw.t
-      type t = Credentials.t
+  module Item = struct
+    type raw = Credentials.Raw.t
+    type t = Credentials.t
 
-      let of_raw = Credentials.of_raw
-      let free = Credentials.Raw.free
-    end
+    let of_raw = Credentials.of_raw
+    let free = Credentials.Raw.free
+  end
 
-    module Cursor = struct
-      type t = Raw.Cursor.t
+  module Cursor = struct
+    type t = Raw.Cursor.t
 
-      let start = Raw.Cursor.create
-      let advance = Raw.Cursor.advance
-      let finish = Raw.Cursor.free
-    end
+    let start = Raw.Cursor.create
+    let advance = Raw.Cursor.advance
+    let finish = Raw.Cursor.free
+  end
 
-    let info = "[krb5_cc_start_seq_get]//[krb5_cc_next_cred]//[krb5_cc_end_seq_get]"
-  end)
+  let info = "[krb5_cc_start_seq_get]//[krb5_cc_next_cred]//[krb5_cc_end_seq_get]"
+end)
 
 let default () =
   let info = Krb_info.create "[krb5_cc_default]" in
@@ -263,13 +263,13 @@ let creds t =
 ;;
 
 let get_credentials'
-      ~tag
-      ~raw:raw_func
-      ?(tag_error_with_all_credentials = Config.verbose_errors)
-      ?(ensure_cached_valid_for_at_least = Time_float.Span.of_min 10.)
-      ~(flags : Krb_flags.Get_credentials.t list)
-      t
-      ~request
+  ~tag
+  ~raw:raw_func
+  ?(tag_error_with_all_credentials = Config.verbose_errors)
+  ?(ensure_cached_valid_for_at_least = Time_float.Span.of_min 10.)
+  ~(flags : Krb_flags.Get_credentials.t list)
+  t
+  ~request
   =
   let tag_arguments = lazy [%message "" ~cred_cache:(t : t) (request : Credentials.t)] in
   let creds_sexp () =

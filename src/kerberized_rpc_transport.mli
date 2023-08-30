@@ -36,7 +36,7 @@ module Tcp : sig
             -> Async_protocol.Connection.t
             -> unit Deferred.t)
         -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.Or_error.t)
-         Kerberized_tcp.async_tcp_server_args
+       Kerberized_tcp.async_tcp_server_args
 
   (** refer to [Kerberized_tcp] and [Kerberized_rpc] for details on these arguments. *)
   val serve_with_anon
@@ -53,7 +53,7 @@ module Tcp : sig
             -> Async_protocol.Connection.t option
             -> unit Deferred.t)
         -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.Or_error.t)
-         Kerberized_tcp.async_tcp_server_args
+       Kerberized_tcp.async_tcp_server_args
 
   (** refer to [Kerberized_tcp] and [Kerberized_rpc] for details on these arguments. *)
   val create_handler
@@ -69,7 +69,7 @@ module Tcp : sig
         -> Async_protocol.Connection.t
         -> unit Deferred.t)
     -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
-         Deferred.Or_error.t
+       Deferred.Or_error.t
 
   (** refer to [Kerberized_tcp] and [Kerberized_rpc] for details on these arguments. *)
   val create_handler_with_anon
@@ -85,7 +85,7 @@ module Tcp : sig
         -> Async_protocol.Connection.t option
         -> unit Deferred.t)
     -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
-         Deferred.Or_error.t
+       Deferred.Or_error.t
 
   (** refer to [Kerberized_tcp] and [Kerberized_rpc] for details on these arguments. *)
   val client
@@ -121,7 +121,7 @@ module Internal : sig
               -> Async_protocol.Connection.t
               -> unit Deferred.t)
           -> (Socket.Address.Inet.t, int) Async.Tcp.Server.t Deferred.Or_error.t)
-           Kerberized_tcp.async_tcp_server_args
+         Kerberized_tcp.async_tcp_server_args
 
     val client
       :  ?override_supported_versions:int list

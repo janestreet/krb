@@ -14,10 +14,10 @@ let fqdn host =
 
     *)
     >>| List.filter ~f:(fun potential_fqdn ->
-      match String.chop_prefix potential_fqdn ~prefix:host with
-      | None -> false
-      | Some "" -> true
-      | Some suffix -> String.is_prefix suffix ~prefix:".")
+          match String.chop_prefix potential_fqdn ~prefix:host with
+          | None -> false
+          | Some "" -> true
+          | Some suffix -> String.is_prefix suffix ~prefix:".")
   with
   | [] -> Or_error.errorf "No canonical name found for [%s]" host
   | [ fqdn ] -> Ok fqdn

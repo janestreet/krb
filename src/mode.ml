@@ -57,8 +57,8 @@ module Server = struct
   [@@deriving compare, hash, sexp_of]
 
   let[@warning "-16"] kerberized
-                        ?(conn_type_preference = Conn_type_preference.accept_all)
-                        ~key_source
+    ?(conn_type_preference = Conn_type_preference.accept_all)
+    ~key_source
     =
     Kerberized (key_source, conn_type_preference)
   ;;

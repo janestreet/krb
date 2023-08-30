@@ -5,8 +5,8 @@ module type S = sig
 
   module Test_mode :
     Test_mode_protocol.S
-    with type protocol_backend = protocol_backend
-     and type Connection.t = Connection.t
+      with type protocol_backend = protocol_backend
+       and type Connection.t = Connection.t
 end
 
 module type Protocol_with_test_mode = sig

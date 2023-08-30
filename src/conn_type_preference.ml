@@ -14,9 +14,9 @@ module Stable = struct
     include C
 
     include Comparable.V1.Make (struct
-        include T
-        include C
-      end)
+      include T
+      include C
+    end)
   end
 end
 

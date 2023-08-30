@@ -56,11 +56,11 @@ let lift_error = function
 ;;
 
 let run
-      ~(authorize : Authorize.t)
-      ~(acting_as : Acting_as.t)
-      ~my_principal
-      ~peer_address
-      ~peer_principal
+  ~(authorize : Authorize.t)
+  ~(acting_as : Acting_as.t)
+  ~my_principal
+  ~peer_address
+  ~peer_principal
   =
   let run_sided = run_sided ~acting_as ~peer_address ~peer_principal in
   let open Deferred.Or_error.Let_syntax in

@@ -181,9 +181,9 @@ let of_keytab' ?(options = Get_init_creds_opts.default) ?tkt_service principal k
         (Principal.to_raw principal)
         (Keytab.to_raw keytab))
     |> Deferred.Result.map_error ~f:(function
-      | `Raised error -> `Non_auth_failure error
-      | `Krb_error (error, code) ->
-        if is_auth_failure code then `Auth_failure error else `Non_auth_failure error)
+         | `Raised error -> `Non_auth_failure error
+         | `Krb_error (error, code) ->
+           if is_auth_failure code then `Auth_failure error else `Non_auth_failure error)
   in
   Context_sequencer.add_finalizer raw ~f:Raw.free;
   of_raw raw |> non_auth_failure
@@ -192,8 +192,8 @@ let of_keytab' ?(options = Get_init_creds_opts.default) ?tkt_service principal k
 let of_keytab ?options ?tkt_service principal keytab =
   of_keytab' ?options ?tkt_service principal keytab
   >>| Result.map_error ~f:(function
-    | `Auth_failure error -> error
-    | `Non_auth_failure error -> error)
+        | `Auth_failure error -> error
+        | `Non_auth_failure error -> error)
 ;;
 
 let check_password principal ~password =

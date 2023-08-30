@@ -17,15 +17,15 @@ type ('event, 't, 'state) create :=
   ( (?krb_mode:Mode.Client.t
      -> ?bind_to_address:Unix.Inet_addr.t
      -> ?implementations:
-       (Server_principal.t -> 'state Rpc.Connection.Client_implementations.t)
+          (Server_principal.t -> 'state Rpc.Connection.Client_implementations.t)
      -> ?description:Info.t
      -> ?cred_cache:Cred_cache.t
      -> authorize:Authorize.t
      -> (unit -> Host_and_port.t Deferred.Or_error.t)
      -> 't)
-      Kerberized_rpc.async_rpc_args
+    Kerberized_rpc.async_rpc_args
   , 'event )
-    persistent_connection_args
+  persistent_connection_args
 
 (** Arguments passed through to [Persistent_connection.Rpc.create].
     See [Persistent_connection] for documentation. *)

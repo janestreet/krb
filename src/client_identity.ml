@@ -9,7 +9,7 @@ type t =
 [@@deriving fields ~getters ~iterators:create]
 
 let sexp_of_t
-      { client_principal; cross_realm_client_principal; request_forwarded_creds = _ }
+  { client_principal; cross_realm_client_principal; request_forwarded_creds = _ }
   =
   [%message
     (client_principal : Principal.Name.t)

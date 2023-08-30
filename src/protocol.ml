@@ -891,13 +891,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
     module Server = struct
       let do_setup
-            ~conn_type_preference
-            ~authorize
-            ~principal
-            ~wants_forwarded_creds
-            ~peer
-            endpoint
-            backend
+        ~conn_type_preference
+        ~authorize
+        ~principal
+        ~wants_forwarded_creds
+        ~peer
+        endpoint
+        backend
         =
         (match endpoint with
          | `Service keytab -> return (Ok (Mode.Service, `Keytab keytab))
@@ -1004,13 +1004,13 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       ;;
 
       let setup
-            ~conn_type_preference
-            ~authorize
-            ~principal
-            ~wants_forwarded_creds
-            ~peer
-            endpoint
-            backend
+        ~conn_type_preference
+        ~authorize
+        ~principal
+        ~wants_forwarded_creds
+        ~peer
+        endpoint
+        backend
         =
         do_setup
           ~conn_type_preference
@@ -1056,12 +1056,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
       ;;
 
       let setup
-            ~cred_cache
-            ~conn_type_preference
-            ~authorize
-            ~forward_credentials_if_requested
-            ~peer
-            backend
+        ~cred_cache
+        ~conn_type_preference
+        ~authorize
+        ~forward_credentials_if_requested
+        ~peer
+        backend
         =
         Header.Server.read ~backend
         >>=? fun server_header ->
@@ -1734,10 +1734,10 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     ;;
 
     let negotiate'
-          ?(override_supported_versions = Header.V1.versions)
-          ?additional_magic_numbers
-          ~backend
-          principal
+      ?(override_supported_versions = Header.V1.versions)
+      ?additional_magic_numbers
+      ~backend
+      principal
       =
       let force_cross_realm_min_version =
         should_force_cross_realm_min_version principal
@@ -1765,32 +1765,32 @@ module Make (Backend : Protocol_backend_intf.S) = struct
         ~us:advertised_versions
         ~peer:other_versions
       |> Result.map_error ~f:(fun error ->
-        if force_cross_realm_min_version
-        then (
-          (* Check whether negotiation would have succeeded without forcing V5+ *)
-          match
-            Protocol_version_header.negotiate
-              ~allow_legacy_peer:true
-              ~us:
-                (Protocol_version_header.create_exn
-                   ()
-                   ~protocol:Krb
-                   ~supported_versions:override_supported_versions)
-              ~peer:other_versions
-          with
-          | Ok _ ->
-            Error.create_s
-              [%message
-                "Failed to negotate Kerberos version. The process is not running in \
-                 the \"pre-v5 realm\" (Config.pre_v5_assumed_realm), and hence a \
-                 minimum version of 5 is forced."
-                  (error : Error.t)]
-          | Error _ -> error)
-        else error)
+           if force_cross_realm_min_version
+           then (
+             (* Check whether negotiation would have succeeded without forcing V5+ *)
+             match
+               Protocol_version_header.negotiate
+                 ~allow_legacy_peer:true
+                 ~us:
+                   (Protocol_version_header.create_exn
+                      ()
+                      ~protocol:Krb
+                      ~supported_versions:override_supported_versions)
+                 ~peer:other_versions
+             with
+             | Ok _ ->
+               Error.create_s
+                 [%message
+                   "Failed to negotate Kerberos version. The process is not running in \
+                    the \"pre-v5 realm\" (Config.pre_v5_assumed_realm), and hence a \
+                    minimum version of 5 is forced."
+                     (error : Error.t)]
+             | Error _ -> error)
+           else error)
       |> Or_error.map ~f:(fun version ->
-        Debug.log_s (fun () ->
-          [%message "Negotiated Kerberos version" ~v:(version : int)]);
-        `Versioned version)
+           Debug.log_s (fun () ->
+             [%message "Negotiated Kerberos version" ~v:(version : int)]);
+           `Versioned version)
       |> return
       |> handshake_error ~kind:Incompatible_client
     ;;
@@ -1804,14 +1804,14 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
   module Server = struct
     let handshake_exn
-          ?override_supported_versions
-          ?additional_magic_numbers
-          ~authorize
-          ~conn_type_preference
-          ~principal
-          ~peer
-          endpoint
-          backend
+      ?override_supported_versions
+      ?additional_magic_numbers
+      ~authorize
+      ~conn_type_preference
+      ~principal
+      ~peer
+      endpoint
+      backend
       =
       Negotiate.negotiate'
         ?override_supported_versions
@@ -1848,6 +1848,17 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     ;;
 
     let handshake
+      ?override_supported_versions
+      ?additional_magic_numbers
+      ~authorize
+      ~conn_type_preference
+      ~principal
+      ~peer
+      endpoint
+      backend
+      =
+      Deferred.Or_error.try_with ~run:`Schedule ~here:[%here] (fun () ->
+        handshake_exn
           ?override_supported_versions
           ?additional_magic_numbers
           ~authorize
@@ -1855,21 +1866,7 @@ module Make (Backend : Protocol_backend_intf.S) = struct
           ~principal
           ~peer
           endpoint
-          backend
-      =
-      Deferred.Or_error.try_with
-        ~run:`Schedule
-        ~here:[%here]
-        (fun () ->
-           handshake_exn
-             ?override_supported_versions
-             ?additional_magic_numbers
-             ~authorize
-             ~conn_type_preference
-             ~principal
-             ~peer
-             endpoint
-             backend)
+          backend)
       >>| function
       | Error e -> Error (handshake_error' ~kind:Unexpected_exception e)
       | Ok (_ as result) -> result
@@ -1878,12 +1875,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
 
   module Client = struct
     let handshake_exn
-          ?override_supported_versions
-          ~authorize
-          ~client_cred_cache
-          ~conn_type_preference
-          ~peer
-          backend
+      ?override_supported_versions
+      ~authorize
+      ~client_cred_cache
+      ~conn_type_preference
+      ~peer
+      backend
       =
       let cred_cache = Client_cred_cache.cred_cache client_cred_cache in
       Internal.Cred_cache.principal cred_cache
@@ -1915,12 +1912,12 @@ module Make (Backend : Protocol_backend_intf.S) = struct
     ;;
 
     let handshake
-          ?override_supported_versions
-          ~authorize
-          ~client_cred_cache
-          ~conn_type_preference
-          ~peer
-          backend
+      ?override_supported_versions
+      ~authorize
+      ~client_cred_cache
+      ~conn_type_preference
+      ~peer
+      backend
       =
       Monitor.try_with_join_or_error ~rest:`Raise (fun () ->
         handshake_exn

@@ -89,7 +89,7 @@ module Name = struct
         raise_s
           [%sexp
             "Could not convert service principal into username"
-          , { service : string; hostname : string }]
+            , { service : string; hostname : string }]
     ;;
 
     let service_on_this_host ~service =

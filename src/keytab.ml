@@ -161,15 +161,15 @@ let latest_keys keytab =
            keytabs easy to inspect.*)
     Stable_group.group (module Internal.Enctype) ~equiv:Internal.Keyblock.enctype
     >>= Deferred.Or_error.List.map ~how:`Sequential ~f:(fun (enctype, keyblocks) ->
-      match
-        List.dedup_and_sort ~compare:[%compare: Internal.Keyblock.t] keyblocks
-      with
-      | [] -> assert false
-      | [ keyblock ] -> return keyblock
-      | _ :: _ :: _ ->
-        Deferred.Or_error.error_s
-          [%message
-            "conflicting keys" (latest_kvno : int) (enctype : Internal.Enctype.t)])
+          match
+            List.dedup_and_sort ~compare:[%compare: Internal.Keyblock.t] keyblocks
+          with
+          | [] -> assert false
+          | [ keyblock ] -> return keyblock
+          | _ :: _ :: _ ->
+            Deferred.Or_error.error_s
+              [%message
+                "conflicting keys" (latest_kvno : int) (enctype : Internal.Enctype.t)])
   in
   return (latest_kvno, keyblocks)
 ;;
@@ -207,7 +207,7 @@ let update_user_keytab_entries t ~user_principal ~enctypes ~password ~kvno =
   let%bind principal = Principal.create user_principal in
   Set.to_list enctypes
   |> Deferred.Or_error.List.iter ~how:`Sequential ~f:(fun enctype ->
-    add_entry t ~password ~enctype ~kvno ~principal)
+       add_entry t ~password ~enctype ~kvno ~principal)
 ;;
 
 let add_new_entry_for_all_principals ?kvno t ~password ~enctypes =

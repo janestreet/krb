@@ -9,8 +9,8 @@ open! Import
 module Client : sig
   val connect_and_handshake
     :  (module Protocol_with_test_mode.S
-         with type protocol_backend = 'backend
-          and type Connection.t = 'conn)
+          with type protocol_backend = 'backend
+           and type Connection.t = 'conn)
     -> create_backend:
          (socket:([ `Active ], Socket.Address.Inet.t) Socket.t
           -> tcp_reader:Reader.t
@@ -37,8 +37,8 @@ module Client : sig
       connection. *)
   val connect_sock_and_handshake
     :  (module Protocol_with_test_mode.S
-         with type protocol_backend = 'backend
-          and type Connection.t = 'conn)
+          with type protocol_backend = 'backend
+           and type Connection.t = 'conn)
     -> create_backend:
          (socket:([ `Active ], Socket.Address.Inet.t) Socket.t -> 'backend Or_error.t)
     -> ?interrupt:unit Deferred.t
@@ -56,15 +56,15 @@ module Server : sig
     val create
       :  Server_key_source.t
       -> (Principal.t
-          * (unit
-             -> [ `Service of Keytab.t | `User_to_user_via_tgt of Internal.Credentials.t ]
-                  Deferred.Or_error.t))
-           Deferred.Or_error.t
+         * (unit
+            -> [ `Service of Keytab.t | `User_to_user_via_tgt of Internal.Credentials.t ]
+               Deferred.Or_error.t))
+         Deferred.Or_error.t
   end
 
   val handler_from_server_protocol
     :  ?on_kerberos_error:
-      [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
+         [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
     -> ?on_handshake_error:
          [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
          | `Ignore
@@ -80,7 +80,7 @@ module Server : sig
              | `Krb_error of Error.t
              | `Rejected_client
              ] )
-             Deferred.Result.t)
+           Deferred.Result.t)
     -> Socket.Address.Inet.t
     -> 'backend Or_error.t
     -> unit Deferred.t
@@ -91,8 +91,8 @@ module Server : sig
     :  ?override_supported_versions:int list
     -> ?additional_magic_numbers:int list
     -> (module Protocol_with_test_mode_intf.S
-         with type protocol_backend = 'backend
-          and type Connection.t = 'conn)
+          with type protocol_backend = 'backend
+           and type Connection.t = 'conn)
     -> authorize:Authorize.t
     -> krb_mode:Mode.Server.t
     -> unit
@@ -103,22 +103,22 @@ module Server : sig
              | `Krb_error of Error.t
              | `Rejected_client
              ] )
-             Deferred.Result.t)
-         Deferred.Or_error.t
+           Deferred.Result.t)
+       Deferred.Or_error.t
 
   val krb_or_anon_server_protocol
     :  ?override_supported_versions:int list
     -> (module Protocol_backend_intf.S with type t = 'backend)
     -> (module Protocol_with_test_mode_intf.S
-         with type protocol_backend = 'backend
-          and type Connection.t = 'conn)
+          with type protocol_backend = 'backend
+           and type Connection.t = 'conn)
     -> peek_protocol_version_header:
          ('backend
           -> [< `Eof
              | `Not_enough_data
              | `Ok of Protocol_version_header.Known_protocol.t option
              ]
-               Deferred.t)
+             Deferred.t)
     -> authorize:Authorize.Anon.t
     -> krb_mode:Mode.Server.t
     -> unit
@@ -129,6 +129,6 @@ module Server : sig
              | `Krb_error of Error.t
              | `Rejected_client
              ] )
-             Deferred.Result.t)
-         Deferred.Or_error.t
+           Deferred.Result.t)
+       Deferred.Or_error.t
 end

@@ -10,7 +10,7 @@ val connect_and_handshake
            -> tcp_writer:Writer.t
            -> 'conn Deferred.Or_error.t)
      -> 'conn Deferred.Or_error.t)
-      Tcp.Aliases.with_connect_options
+    Tcp.Aliases.with_connect_options
 
 (** A helper function to [Tcp.connect_sock] and then call [handshake]. This one doesn't
     create a reader and writer like the one above. *)

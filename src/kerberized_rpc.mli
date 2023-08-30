@@ -40,17 +40,17 @@ module Connection : sig
   type ('client_identity, 'authorize, 'conn_state, 'r) krb_rpc_args :=
     ?on_kerberos_error:
       [ `Call of Socket.Address.Inet.t -> exn -> unit | `Ignore | `Raise ]
-    (** [on_kerberos_error] defaults to logging to [Log.Global.error]. See
+      (** [on_kerberos_error] defaults to logging to [Log.Global.error]. See
         [kerberized_tcp.mli] for more details. *)
     -> ?on_handshake_error:
          [ `Call of Handshake_error.Kind.t -> Socket.Address.Inet.t -> exn -> unit
          | `Ignore
          | `Raise
          ]
-    (** on_handshake_error defaults to [`Ignore]. See [kerberized_tcp.mli] for more
+         (** on_handshake_error defaults to [`Ignore]. See [kerberized_tcp.mli] for more
         details. *)
     -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
-    (** [on_done_with_internal_buffer] determines if internal buffers are zeroed out after
+         (** [on_done_with_internal_buffer] determines if internal buffers are zeroed out after
         use. The default is [`Do_nothing]. *)
     -> authorize:'authorize (** See the [Authorize] module for more docs *)
     -> implementations:'conn_state Rpc.Implementations.t
@@ -63,17 +63,17 @@ module Connection : sig
     , 'authorize
     , 'conn_state
     , where_to_listen:Tcp.Where_to_listen.inet
-    -> krb_mode:Mode.Server.t
-    -> unit
-    -> (Socket.Address.Inet.t, int) Kerberized_tcp.Server.t Deferred.Or_error.t )
-      krb_rpc_args
-      Kerberized_tcp.async_tcp_server_args
-      async_rpc_args
+      -> krb_mode:Mode.Server.t
+      -> unit
+      -> (Socket.Address.Inet.t, int) Kerberized_tcp.Server.t Deferred.Or_error.t )
+    krb_rpc_args
+    Kerberized_tcp.async_tcp_server_args
+    async_rpc_args
 
   (** [serve] starts an RPC server that provides the given [implementations] *)
   val serve
     :  ?additional_magic_numbers:int list
-    (** [additional_magic_numbers] adds additional version numbers to be
+         (** [additional_magic_numbers] adds additional version numbers to be
         advertised by the server during protocol negotiation, usually in
         the context of reporting metadata about the server. *)
     -> (Client_identity.t, Authorize.t, 'a) server_args
@@ -96,11 +96,11 @@ module Connection : sig
     , 'authorize
     , 'conn_state
     , krb_mode:Mode.Server.t
-    -> unit
-    -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
+      -> unit
+      -> (Socket.Address.Inet.t -> Reader.t -> Writer.t -> unit Deferred.t)
          Deferred.Or_error.t )
-      krb_rpc_args
-      async_rpc_args
+    krb_rpc_args
+    async_rpc_args
 
   (** [create_handler] is the same as [serve], but it provides a handler that can be used
       with an externally created TCP server. *)
@@ -114,14 +114,14 @@ module Connection : sig
 
   type ('a, 'conn_state) with_client_args :=
     (?implementations:
-      (Server_principal.t -> 'conn_state Rpc.Connection.Client_implementations.t)
+       (Server_principal.t -> 'conn_state Rpc.Connection.Client_implementations.t)
      -> ?description:Info.t
      -> ?cred_cache:Cred_cache.t (** This defaults to a new MEMORY cache. *)
      -> ?buffer_age_limit:[ `At_most of Time_float.Span.t | `Unlimited ]
-     (** Uses the default value in [Writer.create] if not passed. *)
+          (** Uses the default value in [Writer.create] if not passed. *)
      -> ?on_credential_forwarding_request:
-       (Server_principal.t -> On_credential_forwarding_request.t)
-     (** [on_credential_forwarding_request] is called to validate a credential request
+          (Server_principal.t -> On_credential_forwarding_request.t)
+          (** [on_credential_forwarding_request] is called to validate a credential request
          from a server. The default is [Fn.const `Deny].
 
          NOTE: Applications that want to use delegated credentials are sitting in a
@@ -130,13 +130,13 @@ module Connection : sig
          applications without vetting and careful considerations around security
          first. *)
      -> ?on_done_with_internal_buffer:[ `Do_nothing | `Zero ]
-     (** [on_done_with_internal_buffer] determines if internal buffers are zeroed out after
+          (** [on_done_with_internal_buffer] determines if internal buffers are zeroed out after
          use. The default is [`Do_nothing]. *)
      -> ?krb_mode:Mode.Client.t (** default: [Mode.Client.kerberized] *)
      -> authorize:Authorize.t (** See the [Authorize] module for more docs *)
      -> Socket.Address.Inet.t Tcp.Where_to_connect.t
      -> 'a)
-      async_rpc_args
+    async_rpc_args
 
   (** [client] creates a [Connection.t] appropriate for dispatching RPC's to a
       kerberized server. *)
@@ -153,7 +153,7 @@ module Connection : sig
     val serve
       :  ?override_supported_versions:int list
       -> ?additional_magic_numbers:int list
-      (** If used in conjunction with [override_supported_versions], these
+           (** If used in conjunction with [override_supported_versions], these
           numbers are added additionally to these specified versions. *)
       -> (Client_identity.t, Authorize.t, 'a) server_args
   end

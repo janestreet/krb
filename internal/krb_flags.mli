@@ -3,10 +3,10 @@ open! Core
 module Ap_req : sig
   type t =
     | AP_OPTS_USE_SESSION_KEY
-    (** Use a tgt's session key (instead of server key) to encrypt the service ticket.
+        (** Use a tgt's session key (instead of server key) to encrypt the service ticket.
         This is used for user to user mode. *)
     | AP_OPTS_MUTUAL_REQUIRED
-    (** Mutual authentication is required. This means that the server must prove its
+        (** Mutual authentication is required. This means that the server must prove its
         identity to the client via an AP_REP message. *)
 end
 
@@ -21,7 +21,7 @@ end
 module Get_credentials : sig
   type t =
     | KRB5_GC_CACHED
-    (** Want a cached ticket. If this is specified, getting credentials from a cred cache
+        (** Want a cached ticket. If this is specified, getting credentials from a cred cache
         that doesn't have them will fail, instead of reaching out to the KDC to get
         them. *)
     | KRB5_GC_USER_USER (** Want a user-user ticket *)

@@ -62,18 +62,15 @@ let create_writer conn_type auth_context writer =
            Writer.write_bin_prot writer Bigstring.Stable.V1.bin_writer_t bstr;
            `Continue
        in
-       Monitor.try_with
-         ~run:`Schedule
-         ~name:"Kerberized_rw.create_writer"
-         (fun () ->
-            Reader.read_one_chunk_at_a_time plaintext_r ~handle_chunk
-            >>| function
-            | `Eof | `Stopped () -> ()
-            | `Eof_with_unconsumed_data _ ->
-              failwith "Impossible b/c we always consume all data above.")
+       Monitor.try_with ~run:`Schedule ~name:"Kerberized_rw.create_writer" (fun () ->
+         Reader.read_one_chunk_at_a_time plaintext_r ~handle_chunk
+         >>| function
+         | `Eof | `Stopped () -> ()
+         | `Eof_with_unconsumed_data _ ->
+           failwith "Impossible b/c we always consume all data above.")
        >>| (function
-         | Ok () -> ()
-         | Error exn -> Monitor.send_exn monitor exn)
+             | Ok () -> ()
+             | Error exn -> Monitor.send_exn monitor exn)
        >>= fun () ->
        Deferred.all_unit [ Reader.close plaintext_r; Writer.close plaintext_w ]
        >>= fun () -> Writer.close writer);
@@ -123,31 +120,31 @@ let create_reader conn_type auth_context ~writer reader =
          ~here:[%here]
          ~name:"Kerberized_rw.create_reader"
          (fun () ->
-            let pipe =
-              reader_read_all reader (fun r ->
-                Reader.read_bin_prot r Bigstring.Stable.V1.bin_reader_t)
-            in
-            Pipe.fold' pipe ~init:(Ok ()) ~f:(fun result ts ->
-              if Writer.can_write plaintext_w
-              then
-                Deferred.Queue.fold ts ~init:result ~f:(fun result t ->
-                  return result
-                  >>=? fun () ->
-                  transformation auth_context (Bigsubstring.create t)
-                  >>|? fun bstr ->
-                  if can_actually_write plaintext_w
-                  then Writer.write_bigstring plaintext_w bstr)
-              else
-                (* Silently drop anything left if the writer is closed as that's the least
+         let pipe =
+           reader_read_all reader (fun r ->
+             Reader.read_bin_prot r Bigstring.Stable.V1.bin_reader_t)
+         in
+         Pipe.fold' pipe ~init:(Ok ()) ~f:(fun result ts ->
+           if Writer.can_write plaintext_w
+           then
+             Deferred.Queue.fold ts ~init:result ~f:(fun result t ->
+               return result
+               >>=? fun () ->
+               transformation auth_context (Bigsubstring.create t)
+               >>|? fun bstr ->
+               if can_actually_write plaintext_w
+               then Writer.write_bigstring plaintext_w bstr)
+           else
+             (* Silently drop anything left if the writer is closed as that's the least
                    bad thing *)
-                return result))
+             return result))
        >>| (function
-         | Ok (Ok ()) -> ()
-         | Ok (Error krb_error) ->
-           Error.tag ~tag:"kerberos decryption failed" krb_error
-           |> Error.to_exn
-           |> Monitor.send_exn monitor
-         | Error e -> Monitor.send_exn monitor (Error.to_exn e))
+             | Ok (Ok ()) -> ()
+             | Ok (Error krb_error) ->
+               Error.tag ~tag:"kerberos decryption failed" krb_error
+               |> Error.to_exn
+               |> Monitor.send_exn monitor
+             | Error e -> Monitor.send_exn monitor (Error.to_exn e))
        >>= fun () ->
        Writer.close writer
        >>= fun () -> Reader.close reader >>= fun () -> Writer.close plaintext_w);

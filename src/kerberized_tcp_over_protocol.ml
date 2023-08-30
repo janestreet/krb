@@ -4,15 +4,15 @@ open! Import
 
 module Client = struct
   let handshake'
-        (type backend conn)
-        (module Protocol : Protocol_with_test_mode_intf.S
-          with type protocol_backend = backend
-           and type Connection.t = conn)
-        ?override_supported_versions
-        ~authorize
-        ~backend
-        ~krb_mode_with_client_cred_cache
-        socket
+    (type backend conn)
+    (module Protocol : Protocol_with_test_mode_intf.S
+      with type protocol_backend = backend
+       and type Connection.t = conn)
+    ?override_supported_versions
+    ~authorize
+    ~backend
+    ~krb_mode_with_client_cred_cache
+    socket
     =
     let open Deferred.Or_error.Let_syntax in
     let peer = Socket.getpeername socket in
@@ -41,17 +41,17 @@ module Client = struct
   ;;
 
   let[@warning "-16"] handshake
-                        (type backend conn)
-                        (module Protocol : Protocol_with_test_mode_intf.S
-                          with type protocol_backend = backend
-                           and type Connection.t = conn)
-                        ~create_backend
-                        ?override_supported_versions
-                        ~authorize
-                        ~krb_mode_with_client_cred_cache
-                        ~socket
-                        ~tcp_reader
-                        ~tcp_writer
+    (type backend conn)
+    (module Protocol : Protocol_with_test_mode_intf.S
+      with type protocol_backend = backend
+       and type Connection.t = conn)
+    ~create_backend
+    ?override_supported_versions
+    ~authorize
+    ~krb_mode_with_client_cred_cache
+    ~socket
+    ~tcp_reader
+    ~tcp_writer
     =
     let open Deferred.Or_error.Let_syntax in
     let%bind backend =
@@ -67,15 +67,15 @@ module Client = struct
   ;;
 
   let[@warning "-16"] handshake_sock
-                        (type backend conn)
-                        (module Protocol : Protocol_with_test_mode_intf.S
-                          with type protocol_backend = backend
-                           and type Connection.t = conn)
-                        ~create_backend
-                        ?override_supported_versions
-                        ~authorize
-                        ~krb_mode_with_client_cred_cache
-                        ~socket
+    (type backend conn)
+    (module Protocol : Protocol_with_test_mode_intf.S
+      with type protocol_backend = backend
+       and type Connection.t = conn)
+    ~create_backend
+    ?override_supported_versions
+    ~authorize
+    ~krb_mode_with_client_cred_cache
+    ~socket
     =
     let open Deferred.Or_error.Let_syntax in
     let%bind backend = create_backend ~socket |> Deferred.return in
@@ -107,22 +107,22 @@ module Client = struct
   ;;
 
   let connect_and_handshake
-        (type backend conn)
-        (module Backend_protocol : Protocol_with_test_mode_intf.S
-          with type protocol_backend = backend
-           and type Connection.t = conn)
-        ~create_backend
-        ?buffer_age_limit
-        ?interrupt
-        ?reader_buffer_size
-        ?writer_buffer_size
-        ?timeout
-        ?time_source
-        ?override_supported_versions
-        ?cred_cache
-        ?krb_mode
-        ~authorize
-        where_to_connect
+    (type backend conn)
+    (module Backend_protocol : Protocol_with_test_mode_intf.S
+      with type protocol_backend = backend
+       and type Connection.t = conn)
+    ~create_backend
+    ?buffer_age_limit
+    ?interrupt
+    ?reader_buffer_size
+    ?writer_buffer_size
+    ?timeout
+    ?time_source
+    ?override_supported_versions
+    ?cred_cache
+    ?krb_mode
+    ~authorize
+    where_to_connect
     =
     (* we have to do this logic upfront so that we don't try to connect if there is
        any error while creating the client cred cache. *)
@@ -148,18 +148,18 @@ module Client = struct
   ;;
 
   let connect_sock_and_handshake
-        (type backend conn)
-        (module Backend_protocol : Protocol_with_test_mode_intf.S
-          with type protocol_backend = backend
-           and type Connection.t = conn)
-        ~create_backend
-        ?interrupt
-        ?timeout
-        ?override_supported_versions
-        ?cred_cache
-        ?krb_mode
-        ~authorize
-        where_to_connect
+    (type backend conn)
+    (module Backend_protocol : Protocol_with_test_mode_intf.S
+      with type protocol_backend = backend
+       and type Connection.t = conn)
+    ~create_backend
+    ?interrupt
+    ?timeout
+    ?override_supported_versions
+    ?cred_cache
+    ?krb_mode
+    ~authorize
+    where_to_connect
     =
     (* we have to do this logic upfront so that we don't try to connect if there is
        any error while creating the client cred cache. *)
@@ -230,19 +230,19 @@ module Server = struct
   let write_to_log_global =
     `Call
       (fun remote_addr exn ->
-         Log.Global.sexp
-           ~level:`Error
-           [%message "Kerberos error" (remote_addr : Socket.Address.Inet.t) (exn : Exn.t)])
+        Log.Global.sexp
+          ~level:`Error
+          [%message "Kerberos error" (remote_addr : Socket.Address.Inet.t) (exn : Exn.t)])
   ;;
 
   let handler_from_server_protocol
-        ?(on_kerberos_error = write_to_log_global)
-        ?(on_handshake_error = `Ignore)
-        ?(on_handler_error = `Raise)
-        handle_client
-        server_protocol
-        peer
-        backend_or_error
+    ?(on_kerberos_error = write_to_log_global)
+    ?(on_handshake_error = `Ignore)
+    ?(on_handler_error = `Raise)
+    handle_client
+    server_protocol
+    peer
+    backend_or_error
     =
     let monitor = Monitor.current () in
     Monitor.try_with_or_error ~here:[%here] (fun () ->
@@ -271,20 +271,20 @@ module Server = struct
     | Ok (Ok connection) ->
       Monitor.try_with_or_error ~here:[%here] (fun () -> handle_client peer connection)
       >>= (function
-        | Error e -> return (handle_on_error ~monitor on_handler_error peer e)
-        | Ok () -> return ())
+      | Error e -> return (handle_on_error ~monitor on_handler_error peer e)
+      | Ok () -> return ())
   ;;
 
   let krb_server_protocol
-        ?override_supported_versions
-        ?additional_magic_numbers
-        (type backend conn)
-        (module Protocol : Protocol_with_test_mode_intf.S
-          with type protocol_backend = backend
-           and type Connection.t = conn)
-        ~authorize
-        ~krb_mode
-        ()
+    ?override_supported_versions
+    ?additional_magic_numbers
+    (type backend conn)
+    (module Protocol : Protocol_with_test_mode_intf.S
+      with type protocol_backend = backend
+       and type Connection.t = conn)
+    ~authorize
+    ~krb_mode
+    ()
     =
     match (krb_mode : Mode.Server.t) with
     | Kerberized (key_source, conn_type_preference) ->
@@ -314,16 +314,16 @@ module Server = struct
   ;;
 
   let krb_or_anon_server_protocol
-        ?override_supported_versions
-        (type backend conn)
-        (module _ : Protocol_backend_intf.S with type t = backend)
-        (module Protocol : Protocol_with_test_mode_intf.S
-          with type protocol_backend = backend
-           and type Connection.t = conn)
-        ~peek_protocol_version_header
-        ~authorize
-        ~krb_mode
-        ()
+    ?override_supported_versions
+    (type backend conn)
+    (module _ : Protocol_backend_intf.S with type t = backend)
+    (module Protocol : Protocol_with_test_mode_intf.S
+      with type protocol_backend = backend
+       and type Connection.t = conn)
+    ~peek_protocol_version_header
+    ~authorize
+    ~krb_mode
+    ()
     =
     let authorize_mapped = Authorize.krb_of_anon authorize in
     krb_server_protocol
@@ -346,11 +346,11 @@ module Server = struct
         return
           (Error
              (`Handshake_error
-                (Handshake_error.of_error
-                   ~kind:Unexpected_or_no_client_bytes
-                   (Error.of_string
-                      "Not enough data written by the client to determine if it's \
-                       kerberized"))))
+               (Handshake_error.of_error
+                  ~kind:Unexpected_or_no_client_bytes
+                  (Error.of_string
+                     "Not enough data written by the client to determine if it's \
+                      kerberized"))))
       | `Ok (Some Protocol_version_header.Known_protocol.Krb) | `Ok (Some Krb_test_mode)
         -> krb_server_protocol ~peer backend >>|? fun conn -> `Krb conn
       (* [None] is assumed to be an async rpc client here so that async rpc clients

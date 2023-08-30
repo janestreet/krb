@@ -150,7 +150,7 @@ let make ~default ~help_message =
                ])
           ~verbose_errors:
             (field [%sexp_of: bool] [ "\n  Whether error messages should be verbose.\n" ])
-          (* Purposefully undocumented; this should only be set by the kerberos sandbox. *)
+            (* Purposefully undocumented; this should only be set by the kerberos sandbox. *)
           ~sandboxing_state:(fun acc _ -> acc)
       in
       String.concat
