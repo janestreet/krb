@@ -26,7 +26,8 @@ module Reader = struct
     then
       Error.raise_s
         [%message
-          "Kerberized_rpc_transport: message too small or too big"
+          "Kerberized_rpc_transport: message is too large or has negative size. Try \
+           increasing the size limit by setting the KRB_RPC_MAX_MESSAGE_SIZE env var"
             ~message_size:(payload_length : int)
             (t.max_message_size : int)]
   ;;
